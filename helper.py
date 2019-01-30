@@ -102,6 +102,12 @@ def normalize(vector):
 	mag = math.sqrt(vector[0] ** 2 + vector[1] ** 2)+1e-6
 	return vector[0] / mag, vector[1] / mag
 
+def normalize_vector(x, eps=1e-9):
+    mean = np.mean(x)
+    std = np.std(x)
+    x = (x - mean)/(std+eps)
+    return x
+
 def side_of_point_on_line(start_pt, end_pt, query_pt):
 	det = (end_pt[0] - start_pt[0]) * (query_pt[1] - start_pt[1]) - (end_pt[1] - start_pt[1]) * (query_pt[0] - start_pt[0])
 	if det > 0:

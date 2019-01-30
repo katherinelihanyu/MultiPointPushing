@@ -3,8 +3,8 @@ import math
 import time
 import copy
 
-# import pygame
-# from pygame.locals import (QUIT, KEYDOWN, K_ESCAPE)
+import pygame
+from pygame.locals import (QUIT, KEYDOWN, K_ESCAPE)
 import numpy as np
 import pickle
 
@@ -18,6 +18,7 @@ import json
 import random
 from policies import *
 from prune import *
+from keras.models import load_model
 
 PPM = 60.0  # pixels per meter
 TIME_STEP = 0.1
@@ -60,7 +61,7 @@ class Polygon:
 		self.vertices = vertices
 		self.color = color
 		self.original_pos = np.array(self.body.position)
-		self.bounding_circle_radius = math.sqrt(max((self.vertices)[:,0]**2 + (self.vertices)[:,1]**2))
+		self.bounding_circle_radius = math.sqrt(max(self.vertices[:,0]**2 + self.vertices[:,1]**2))
 		self.disk_coverage = compute_area(self.vertices)/(self.bounding_circle_radius**2*math.pi)
 
 	def test_overlap(self, other_polygon):
@@ -271,43 +272,49 @@ class SingulationEnv:
 		self.centroid = compute_centroid(self.bounding_convex_hull.tolist())
 		self.bounding_circle_radius = math.sqrt(max((self.bounding_convex_hull - np.array(self.centroid))[:,0]**2 + (self.bounding_convex_hull - np.array(self.centroid))[:,1]**2))
 
-	
 	def step(self, start_pt, end_pt, path, display=False, check_reachable=True):
 
 		# display
-		# if display:
-		# 	# self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), 0, 32)
-		# 	# pygame.display.iconify()
+		if display:
+			self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), 0, 32)
+			pygame.display.iconify()
 
-		# 	self.screen.fill((255, 255, 255, 255))
+			self.screen.fill((255, 255, 255, 255))
 
-		# 	def my_draw_polygon(polygon, body, fixture, color):
-		# 		vertices = [(body.transform * v) * PPM for v in polygon.vertices]
-		# 		vertices = [(v[0], SCREEN_HEIGHT - v[1]) for v in vertices]
-				
-		# 		# pygame.draw.polygon(self.screen, color, vertices, 0)
-		# 		# pygame.draw.polygon(self.screen, (0,0,0,0), vertices, 3)
+			def my_draw_polygon(polygon, body, fixture, color):
+				vertices = [(body.transform * v) * PPM for v in polygon.vertices]
+				vertices = [(v[0], SCREEN_HEIGHT - v[1]) for v in vertices]
 
-		# 	polygonShape.draw = my_draw_polygon
+				pygame.draw.polygon(self.screen, color, vertices, 0)
+				pygame.draw.polygon(self.screen, (0, 0, 0, 0), vertices, 5)
+
+			polygonShape.draw = my_draw_polygon
+
+			def my_draw_circle(circle, body, fixture, color):
+				position = body.transform * circle.pos * PPM
+				position = (position[0], SCREEN_HEIGHT - position[1])
+				pygame.draw.circle(self.screen, color, [int(
+					x) for x in position], int(circle.radius * PPM))
+
+			# Note: Python 3.x will enforce that pygame get the integers it requests,
+			#       and it will not convert from float.
+			circleShape.draw = my_draw_circle
 		#
-
-
 
 		start_pt = np.array(start_pt)
 		end_pt = np.array(end_pt)
 
 		self.rod = self.world.CreateKinematicBody(position=(start_pt[0], start_pt[1]), allowSleep=False)
-		self.rodfix = self.rod.CreatePolygonFixture(vertices=[(0.1, 0.1), (-0.1, 0.1), (-0.1, -0.1), (0.1, -0.1)])
+		self.rodfix = self.rod.CreateCircleFixture(radius=0.1)
+		vector = np.array(normalize(end_pt - np.array(start_pt)))
 
-		vector = np.array(normalize(end_pt - np.array(self.rod.position)))
+		vertices_lst = [(0.0, 0.1), (0.0, -0.1), (-0.3, -0.1), (-0.3, 0.1)]
+
+		testrod = self.world.CreateKinematicBody(position=(start_pt[0], start_pt[1]), allowSleep=False)
+		testrodfix = testrod.CreatePolygonFixture(vertices=[rotatePt(pt, vector) for pt in vertices_lst])
 
 		# reachability check
 		if check_reachable:
-			vertices_lst=[(0.0, 0.1), (0.0, -0.1), (-0.3, -0.1), (-0.3, 0.1)]
-
-			testrod = self.world.CreateKinematicBody(position=(start_pt[0], start_pt[1]), allowSleep=False)
-			testrodfix = testrod.CreatePolygonFixture(vertices=[rotatePt(pt, vector) for pt in vertices_lst])
-
 			while (np.count_nonzero(np.array([o.dist_rod(testrodfix, testrod) for o in self.objs]) <= 0) > 0):
 				# print(start_pt, [o.dist_rod(self.rodfix, self.rod) for o in self.objs])
 				start_pt -= 0.1 * vector
@@ -317,8 +324,11 @@ class SingulationEnv:
 				testrod = self.world.CreateKinematicBody(position=(start_pt[0], start_pt[1]), allowSleep=False)
 				testrodfix = testrod.CreatePolygonFixture(vertices=[rotatePt(pt, vector) for pt in vertices_lst])
 
-			testrod.DestroyFixture(testrodfix)
-			self.world.DestroyBody(testrod)
+		testrod.DestroyFixture(testrodfix)
+		self.world.DestroyBody(testrod)
+
+		self.rod = self.world.CreateKinematicBody(position=(start_pt[0], start_pt[1]), allowSleep=False)
+		self.rodfix = self.rod.CreateCircleFixture(radius=0.1)
 
 		self.rod.linearVelocity[0] = vector[0]
 		self.rod.linearVelocity[1] = vector[1]
@@ -326,17 +336,17 @@ class SingulationEnv:
 
 		timestamp = 0
 
-		damping_factor = 1 - ((1-0.5) / 3)
+		damping_factor = 1 - ((1 - 0.5) / 3)
 
 		# display
-		# if display:
-		# 	for obj in self.objs:
-		# 		for fix in obj.fixtures:
-		# 			fix.shape.draw(obj.body, fix, obj.color)
+		if display:
+			for obj in self.objs:
+				for fix in obj.fixtures:
+					fix.shape.draw(obj.body, fix, obj.color)
 
-		# 	self.rodfix.shape.draw(self.rod, self.rodfix, (0, 0, 0, 255))
+			self.rodfix.shape.draw(self.rod, self.rodfix, (0, 0, 0, 255))
 
-			# pygame.image.save(self.screen, path+"start.png")
+			pygame.image.save(self.screen, os.path.join(path, '0.png'))
 		#
 
 		first_contact = -1
@@ -353,38 +363,36 @@ class SingulationEnv:
 				obj.body.linearVelocity[1] = obj.body.linearVelocity[1] * damping_factor
 				obj.body.angularVelocity = obj.body.angularVelocity * damping_factor
 
-			if (math.sqrt(np.sum((start_pt - np.array(self.rod.position))**2)) < 4):
+			if (math.sqrt(np.sum((start_pt - np.array(self.rod.position)) ** 2)) < 4):
 
-				vector = normalize((end_pt+1e-8) - (start_pt+1e-8))
+				vector = normalize((end_pt + 1e-8) - (start_pt + 1e-8))
 				self.rod.linearVelocity[0] = vector[0]
 				self.rod.linearVelocity[1] = vector[1]
 
 			else:
 				self.rod.linearVelocity[0] = 0
 				self.rod.linearVelocity[1] = 0
-				break
 
-			self.world.Step(TIME_STEP, 8, 3)
+			self.world.Step(TIME_STEP, 10, 10)
 			timestamp += 1
 
 			# display
-			# if display:
-			# 	self.screen.fill((255, 255, 255, 255))
+			if display:
+				self.screen.fill((255, 255, 255, 255))
 
-			# 	for obj in self.objs:
-			# 		for fix in obj.fixtures:
-			# 			fix.shape.draw(obj.body, fix, obj.color)
+				for obj in self.objs:
+					for fix in obj.fixtures:
+						fix.shape.draw(obj.body, fix, obj.color)
 
-			# 	self.rodfix.shape.draw(self.rod, self.rodfix, (0, 0, 0, 255))
+				self.rodfix.shape.draw(self.rod, self.rodfix, (0, 0, 0, 255))
 
-				# pygame.image.save(self.screen, path+str(timestamp)+".png")
-			#
+				pygame.image.save(self.screen, os.path.join(path, str(timestamp) + '.png'))
+		#
 
-			
-		# # display
-		# if display:
-		# 	# pygame.display.quit()
-		# 	# pygame.quit()
+		# display
+		if display:
+			pygame.display.quit()
+			pygame.quit()
 		#
 
 		return first_contact
@@ -750,7 +758,7 @@ class SingulationEnv:
 			count += (sigmoid(min_dist*10) - 0.5) * 2
 		return count
 
-	def collect_data_summary(self, start_pt, end_pt, img_path=None, sum_path=None):
+	def collect_data_summary(self, start_pt, end_pt, img_path=None, display=False, sum_path=None):
 		summary = {}
 		abs_start_pt = np.array(start_pt)
 		abs_end_pt = np.array(end_pt)
@@ -772,7 +780,7 @@ class SingulationEnv:
 		summary["count threshold before push"] = self.count_threshold()
 
 
-		first_contact = self.step(start_pt, end_pt, img_path)
+		first_contact = self.step(start_pt, end_pt,  path=img_path,display=display)
 
 		# if first_contact == -1:
 		# 	return
@@ -961,29 +969,72 @@ class SingulationEnv:
 			obj.body.linearVelocity[1] = 0.0
 			obj.body.angularVelocity = 0.0
 
-	# def visualize(self, path):
-	# 	# self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), 0, 32)
-	# 	# pygame.display.iconify()
+	def reset_env_five_objects(self, v):
+		if self.rod:
+			self.rod.DestroyFixture(self.rodfix)
+			self.world.DestroyBody(self.rod)
+			self.rod = None
 
-	# 	self.screen.fill((0, 0, 0, 0))
+		if self.rod2:
+			self.rod2.DestroyFixture(self.rodfix2)
+			self.world.DestroyBody(self.rod2)
+			self.rod2 = None
 
-	# 	def my_draw_polygon(polygon, body, fixture, color):
-	# 		vertices = [(body.transform * v) * PPM for v in polygon.vertices]
-	# 		vertices = [(v[0], SCREEN_HEIGHT - v[1]) for v in vertices]
-			
-	# 		# pygame.draw.polygon(self.screen, color, vertices, 0)
+		for i in range(len(self.objs)):
+			obj = self.objs[i]
+			index = int(33*i)
+			obj.body.position[0] = float(v[index])
+			obj.body.position[1] = float(v[index+1])
+			obj.body.angle = float(v[index+2])
+			# print('object %d: (%f, %f); angle: %f' % (i, obj.body.position[0], obj.body.position[1], obj.body.angle))
+			obj.body.linearVelocity[0] = 0.0
+			obj.body.linearVelocity[1] = 0.0
+			obj.body.angularVelocity = 0.0
 
-	# 	polygonShape.draw = my_draw_polygon
+	def visualize(self, path):
+		display=True
+		if display:
+			self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), 0, 32)
+			pygame.display.iconify()
 
-	# 	for obj in self.objs:
-	# 		obj.fixture.shape.draw(obj.body, obj.fixture, obj.color)
+			self.screen.fill((255, 255, 255, 255))
 
-	# 	self.rodfix.shape.draw(self.rod, self.rodfix, (100, 100, 100, 255))
+			def my_draw_polygon(polygon, body, fixture, color):
+				vertices = [(body.transform * v) * PPM for v in polygon.vertices]
+				vertices = [(v[0], SCREEN_HEIGHT - v[1]) for v in vertices]
 
-	# 	# pygame.image.save(self.screen, path+"debug.png")
+				pygame.draw.polygon(self.screen, color, vertices, 0)
+				pygame.draw.polygon(self.screen, (0, 0, 0, 0), vertices, 5)
 
-		# pygame.display.quit()
-		# pygame.quit()
+			polygonShape.draw = my_draw_polygon
+
+			def my_draw_circle(circle, body, fixture, color):
+				position = body.transform * circle.pos * PPM
+				position = (position[0], SCREEN_HEIGHT - position[1])
+				pygame.draw.circle(self.screen, color, [int(
+					x) for x in position], int(circle.radius * PPM))
+
+			# Note: Python 3.x will enforce that pygame get the integers it requests,
+			#       and it will not convert from float.
+			circleShape.draw = my_draw_circle
+		#
+
+		# display
+		if display:
+			for obj in self.objs:
+				for fix in obj.fixtures:
+					fix.shape.draw(obj.body, fix, obj.color)
+
+			pygame.image.save(self.screen, path)
+		#
+
+		# display
+		if display:
+			pygame.display.quit()
+			pygame.quit()
+		#
+
+		return 1
 
 	def load_env(self, dic):
 		assert (len(dic) - 13) % 6 == 0
@@ -1111,47 +1162,118 @@ class SingulationEnv:
 			return self.collect_data_summary(best_pt[0], best_pt[1], "/", sum_path=sum_path)
 		return best_pt
 
+	def select_random(self, prune_method):
+		pt_lst = prune_method(self)
+		return random.choice(pt_lst)
+
+	def count_threshold_data_generation(self, max_step=4):
+		input_data = []
+		item_label = []
+		action_label = []
+		# data_sum = []
+		curr_pos = self.save_curr_position()
+		best_pts = self.select_random(com_only)
+		if best_pts is None:
+			return [], [], []
+		best_summary = self.collect_data_summary(best_pts[0], best_pts[1], None)
+		best_dist = best_summary["count soft threshold after push"] - best_summary["count soft threshold before push"]
+		if best_dist <= 0:
+			return [], [], []
+		print("best_dist:", best_dist, "count threshold difference:",
+			  best_summary["count threshold after push"] - best_summary["count threshold before push"])
+		state = []
+		for o in self.objs:
+			state.append(o.body.position[0])
+			state.append(o.body.position[1])
+			state.append(o.body.angle)
+			for v in o.vertices: # len(o.vertices)=15
+				state.append(v[0])
+				state.append(v[1])
+		input_data.append(state)  # len(state) = 231 = 7*33
+		item_label.append(best_summary["first contact object"])
+
+		if best_summary["first contact object"] == -1:
+			return [], [], []
+
+		item_pos = curr_pos[best_summary["first contact object"]]
+		start_pt = best_pts[0] - np.array([item_pos[0], item_pos[1]])
+
+		vec = normalize(np.array(best_pts[1]) - np.array(best_pts[0]))
+		action = []
+		action.append(best_pts[0][0])
+		action.append(best_pts[0][1])
+		action.append(vec[0])
+		action.append(vec[1])
+		action_label.append(action)
+
+		return input_data, item_label, action_label
+
+	def generate_state_action_pairs(self,path=None,display=False):
+		state_action = []
+		for o in self.objs:
+			state_action.append(o.body.position[0])
+			state_action.append(o.body.position[1])
+			state_action.append(o.body.angle)
+			for v in o.vertices:
+				state_action.append(v[0])
+				state_action.append(v[1])
+		best_pts = self.select_random(com_only)
+		if best_pts is None:
+			return [], []
+		best_summary = self.collect_data_summary(best_pts[0], best_pts[1], img_path=path, display=display)
+		vec = normalize(np.array(best_pts[1]) - np.array(best_pts[0]))
+		state_action.append(best_pts[0][0])
+		state_action.append(best_pts[0][1])
+		state_action.append(vec[0])
+		state_action.append(vec[1])
+		next_state = []
+		for o in self.objs:
+			next_state.append(o.body.position[0])
+			next_state.append(o.body.position[1])
+			next_state.append(o.body.angle)
+			for v in o.vertices:
+				next_state.append(v[0])
+				next_state.append(v[1])
+		if best_summary["first contact object"] == -1:
+			return [], []
+		return state_action, next_state
+
+def generate_data(data_folder,batch_size,num_objects):
+	state_action_file = []
+	next_state_file = []
+	while len(state_action_file) < batch_size:
+		test = SingulationEnv()
+		while True:
+			try:
+				test.create_random_env(num_objects)
+				break
+			except Exception as e:
+				print(e)
+		state_action, next_state = test.generate_state_action_pairs()
+		state_action_file.append(state_action)
+		next_state_file.append(next_state)
+	np.save(os.path.join(data_folder, "state_action.npy"), np.array(state_action_file))
+	np.save(os.path.join(data_folder, "next_state.npy"), np.array(next_state_file))
+
+def render_images(data_folder, num_objects):
+	test_env = SingulationEnv()
+	model = load_model(os.path.join(data_folder, 'model.h5'))
+	test_env.create_random_env(num_objects)
+	state_action, next_state = test_env.generate_state_action_pairs(
+		path=os.path.join(data_folder, 'push'),display=True)
+	state_action = np.array([state_action])
+	state_action = normalize_vector(state_action)
+	next_state = np.array(next_state)
+	test_prediction = model.predict(state_action)[0]
+	print("state_action",state_action)
+	print("test_prediction", test_prediction)
+	print("label", next_state)
+	test_env.reset_env_five_objects(test_prediction)
+	test_env.visualize(os.path.join(data_folder, 'prediction.png'))
+	test_env.reset_env_five_objects(next_state)
+	test_env.visualize(os.path.join(data_folder, 'label.png'))
+
 if __name__ == "__main__":
-
-	# path = "/nfs/diskstation/zdong/cluster_push_final/"
-	path = "testing/"
-	for num_obj in range(2, 21):
-		if not os.path.exists(path+str(num_obj)):
-			os.makedirs(path+str(num_obj))
-
-		for g in range(0, 4):
-			print(num_obj, g)
-			i=0
-			while i < 25:
-				if not os.path.exists(path+str(num_obj)+"/"+str(g)+"/avg_centroid"):
-					os.makedirs(path+str(num_obj)+"/"+str(g)+"/avg_centroid")
-				if not os.path.exists(path+str(num_obj)+"/"+str(g)+"/count_threshold"):
-					os.makedirs(path+str(num_obj)+"/"+str(g)+"/count_threshold")
-
-				if not os.path.exists(path+str(num_obj)+"/"+str(g)+"/quasi_random"):
-					os.makedirs(path+str(num_obj)+"/"+str(g)+"/quasi_random")
-				
-				print(i)
-				test = SingulationEnv()
-				while True:
-					try:
-						test.create_random_env(num_obj, g)
-						break
-					except:
-						print("retry")
-
-				test.reset()
-				summary = test.prune_best(no_prune, metric="avg centroid", sum_path=path+str(num_obj)+"/"+str(g)+"/avg_centroid/"+str(i))
-				print("take one")
-				test.reset()
-				summary = test.prune_best(no_prune, metric="count threshold", sum_path=path+str(num_obj)+"/"+str(g)+"/count_threshold/"+str(i))
-				print("take two")
-
-				# quasi random
-				test.reset()
-				push_pts = quasi_random(test)
-				if push_pts is None:
-					continue
-				test.collect_data_summary(push_pts[0], push_pts[1], sum_path=path+str(num_obj)+"/"+str(g)+"/quasi_random/"+str(i))
-
-				i = i+1
+	data_folder="/Users/katherineli/Desktop/MultiPointPushing/data/5objects"
+	generate_data(data_folder,batch_size=100000,num_objects=5)
+	# render_images(data_folder, num_objects=5)

@@ -424,7 +424,3 @@ def maximumClearanceRatio(env):
 	if (not p is None) and (not v is None):
 		pts = parametrize_by_bounding_circle(p, v, env.objs[candidate].original_pos, env.objs[candidate].bounding_circle_radius+0.1)
 	return pts
-
-
-
-
