@@ -1068,58 +1068,59 @@ class SingulationEnv:
 			self.objs[i].body.position[1] = position[i][1]
 			self.objs[i].body.angle = position[i][2]
 
-	# def sequential_planning_helper(self, prune_method, step, position, history, metric="count threshold"):
-	# 	if step == 0:
-	# 		return history[-1][metric+" after push"]-history[0][metric+" before push"], history
-	# 	else:
-	# 		pt_lst = prune_method(self)
-	# 		best_sum = None
-	# 		best_metric = 1e2
-	# 		for pts in pt_lst:
-	# 			self.load_position(position)
-	# 			curr_hist = self.collect_data_summary(pts[0], pts[1], None)
-	# 			hist_sum = copy.deepcopy(history)
-	# 			hist_sum.append(curr_hist)
-	# 			curr_pos = self.save_curr_position()
-	# 			value, total = self.sequential_planning_helper(prune_method, step-1, curr_pos, hist_sum, metric)
-	# 			if value is not None and value > best_metric:
-	# 				best_sum = total
-	# 				best_metric = total[-1][metric+" after push"]-total[0][metric+" before push"]
-	# 		if best_sum is not None:
-	# 			return best_metric, best_sum
-	# 		else:
-	# 			return None, None
+	def sequential_planning_helper(self, prune_method, step, position, history, metric="count threshold"):
+		if step == 0:
+			return history[-1][metric+" after push"]-history[0][metric+" before push"], history
+		else:
+			pt_lst = prune_method(self)
+			best_sum = None
+			best_metric = 1e2
+			for pts in pt_lst:
+				self.load_position(position)
+				curr_hist = self.collect_data_summary(pts[0], pts[1], None)
+				hist_sum = copy.deepcopy(history)
+				hist_sum.append(curr_hist)
+				curr_pos = self.save_curr_position()
+				value, total = self.sequential_planning_helper(prune_method, step-1, curr_pos, hist_sum, metric)
+				if value is not None and value > best_metric:
+					best_sum = total
+					best_metric = total[-1][metric+" after push"]-total[0][metric+" before push"]
+			if best_sum is not None:
+				return best_metric, best_sum
+			else:
+				return None, None
 
-	# def sequential_prune_planning(self, prune_method, max_step=10, metric="count threshold", sum_path=None):
-	# 	curr_pos = self.save_curr_position()
-	# 	best_metric, best_sum = self.sequential_planning_helper(prune_method, max_step, curr_pos, [], metric=metric)
+	def sequential_prune_planning_recursive(self, prune_method, max_step=10, metric="count threshold", sum_path=None):
+		curr_pos = self.save_curr_position()
+		best_metric, best_sum = self.sequential_planning_helper(prune_method, max_step, curr_pos, [], metric=metric)
 
-	# 	# for i in range(max_step):
-	# 	# 	curr_pos = self.save_curr_position()
-	# 	# 	best_pts = self.prune_best(prune_method, metric, curr_pos)
-	# 	# 	self.load_position(curr_pos)
-	# 	# 	curr_sum = self.collect_data_summary(best_pts[0], best_pts[1], None)
-	# 	# 	data_sum.append(curr_sum)
-	# 	# 	print(curr_sum[metric +" after push"], curr_sum[metric + " before push"])
-	# 	# return data_sum[-1][metric +" after push"], data_sum[-1][metric + " before push"]
-	# 	if sum_path is not None and best_sum is not None:
-	# 		print(best_metric)
-	# 		with open(sum_path+'.json', 'w') as f:
-	# 			json.dump(best_sum, f)
-	# 	return best_sum
+		# for i in range(max_step):
+		# 	curr_pos = self.save_curr_position()
+		# 	best_pts = self.prune_best(prune_method, metric, curr_pos)
+		# 	self.load_position(curr_pos)
+		# 	curr_sum = self.collect_data_summary(best_pts[0], best_pts[1], None)
+		# 	data_sum.append(curr_sum)
+		# 	print(curr_sum[metric +" after push"], curr_sum[metric + " before push"])
+		# return data_sum[-1][metric +" after push"], data_sum[-1][metric + " before push"]
+		if sum_path is not None and best_sum is not None:
+			print(best_metric)
+			with open(sum_path+'.json', 'w') as f:
+				json.dump(best_sum, f)
+		return best_sum
 
 	def sequential_prune_planning(self, prune_method, max_step=5, metric="count threshold", sum_path=None):
 		data_sum = []
 		for i in range(max_step):
 			curr_pos = self.save_curr_position()
 			best_pts = self.prune_best(prune_method, metric, curr_pos)
+			print("best_pts", best_pts)
 			self.load_position(curr_pos)
 			curr_sum = self.collect_data_summary(best_pts[0], best_pts[1], None)
 			data_sum.append(curr_sum)
 			print(curr_sum[metric +" after push"], curr_sum[metric + " before push"])
 		# return data_sum[-1][metric +" after push"], data_sum[-1][metric + " before push"]
 		if sum_path is not None:
-			with open(sum_path+'.json', 'w') as f:
+			with open(os.path.join(sum_path, "sequential_prune_planning.json"), 'w') as f:
 				json.dump(data_sum, f)
 		return data_sum
 
@@ -1157,9 +1158,9 @@ class SingulationEnv:
 					self.load_position(position)
 				best_sep = summary[metric +" after push"] - summary[metric + " before push"]
 		
-		if best_pt is not None:
-			self.reset()
-			return self.collect_data_summary(best_pt[0], best_pt[1], "/", sum_path=sum_path)
+		# if best_pt is not None:
+		self.reset()
+		# 	return self.collect_data_summary(best_pt[0], best_pt[1], "/", sum_path=sum_path)
 		return best_pt
 
 	def select_random(self, prune_method):
@@ -1275,5 +1276,5 @@ def render_images(data_folder, num_objects):
 
 if __name__ == "__main__":
 	data_folder="/Users/katherineli/Desktop/MultiPointPushing/data/5objects"
-	generate_data(data_folder,batch_size=100000,num_objects=5)
-	# render_images(data_folder, num_objects=5)
+	# generate_data(data_folder,batch_size=100000,num_objects=5)
+	render_images(data_folder, num_objects=5)
