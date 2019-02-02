@@ -385,7 +385,6 @@ class SingulationEnv:
 						fix.shape.draw(obj.body, fix, obj.color)
 
 				self.rodfix.shape.draw(self.rod, self.rodfix, (0, 0, 0, 255))
-
 				pygame.image.save(self.screen, os.path.join(path, str(timestamp) + '.png'))
 		#
 
@@ -1068,46 +1067,6 @@ class SingulationEnv:
 			self.objs[i].body.position[1] = position[i][1]
 			self.objs[i].body.angle = position[i][2]
 
-	def sequential_planning_helper(self, prune_method, step, position, history, metric="count threshold"):
-		if step == 0:
-			return history[-1][metric+" after push"]-history[0][metric+" before push"], history
-		else:
-			pt_lst = prune_method(self)
-			best_sum = None
-			best_metric = 1e2
-			for pts in pt_lst:
-				self.load_position(position)
-				curr_hist = self.collect_data_summary(pts[0], pts[1], None)
-				hist_sum = copy.deepcopy(history)
-				hist_sum.append(curr_hist)
-				curr_pos = self.save_curr_position()
-				value, total = self.sequential_planning_helper(prune_method, step-1, curr_pos, hist_sum, metric)
-				if value is not None and value > best_metric:
-					best_sum = total
-					best_metric = total[-1][metric+" after push"]-total[0][metric+" before push"]
-			if best_sum is not None:
-				return best_metric, best_sum
-			else:
-				return None, None
-
-	def sequential_prune_planning_recursive(self, prune_method, max_step=10, metric="count threshold", sum_path=None):
-		curr_pos = self.save_curr_position()
-		best_metric, best_sum = self.sequential_planning_helper(prune_method, max_step, curr_pos, [], metric=metric)
-
-		# for i in range(max_step):
-		# 	curr_pos = self.save_curr_position()
-		# 	best_pts = self.prune_best(prune_method, metric, curr_pos)
-		# 	self.load_position(curr_pos)
-		# 	curr_sum = self.collect_data_summary(best_pts[0], best_pts[1], None)
-		# 	data_sum.append(curr_sum)
-		# 	print(curr_sum[metric +" after push"], curr_sum[metric + " before push"])
-		# return data_sum[-1][metric +" after push"], data_sum[-1][metric + " before push"]
-		if sum_path is not None and best_sum is not None:
-			print(best_metric)
-			with open(sum_path+'.json', 'w') as f:
-				json.dump(best_sum, f)
-		return best_sum
-
 	def sequential_prune_planning(self, prune_method, max_step=5, metric="count threshold", sum_path=None):
 		data_sum = []
 		for i in range(max_step):
@@ -1138,6 +1097,37 @@ class SingulationEnv:
 			with open(sum_path+'.json', 'w') as f:
 				json.dump(data_sum, f)
 		return data_sum
+
+	def collect_sequential_sample(self, prune_method, max_step=5, metric="count threshold", sum_path=None):
+		# data_sum = []
+		action = None
+		starting_pos = self.save_curr_position()
+		for i in range(max_step):
+			curr_pos = self.save_curr_position()
+			best_pts = self.select_random(prune_method)
+			if action == None:
+				action = best_pts
+			# best_pts = self.prune_best(prune_method, metric, curr_pos)
+			self.load_position(curr_pos)
+			curr_sum = self.collect_data_summary(best_pts[0], best_pts[1], None)
+			# data_sum.append(curr_sum)
+			# print(metric, "after push:", curr_sum[metric +" after push"], "before push:", curr_sum[metric + " before push"])
+		# return data_sum[-1][metric +" after push"], data_sum[-1][metric + " before push"]
+		self.load_position(starting_pos)
+		if sum_path is not None:
+			with open(os.path.join(sum_path, "sequential_prune_planning.json"), 'w') as f:
+				json.dump(curr_sum, f)
+		return curr_sum[metric +" after push"], action
+
+	def best_sequential_sample(self,num_trials, prune_method, max_step=5, metric="count threshold", sum_path=None):
+		best_result = 0
+		best_action = None
+		for i in range(num_trials):
+			result, action = self.collect_sequential_sample(prune_method, max_step, metric, sum_path)
+			if result > best_result:
+				best_result = result
+				best_action = action
+		return best_result, best_action
 
 	def prune_best(self, prune_method, metric="count threshold", position=None, sum_path=None):
 		pt_lst = prune_method(self)
