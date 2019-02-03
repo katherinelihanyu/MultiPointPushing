@@ -273,6 +273,8 @@ class SingulationEnv:
 		self.bounding_circle_radius = math.sqrt(max((self.bounding_convex_hull - np.array(self.centroid))[:,0]**2 + (self.bounding_convex_hull - np.array(self.centroid))[:,1]**2))
 
 	def step(self, start_pt, end_pt, path, display=False, check_reachable=True):
+		if display and not os.path.exists(path):
+			os.makedirs(path)
 
 		# display
 		if display:
@@ -345,7 +347,6 @@ class SingulationEnv:
 					fix.shape.draw(obj.body, fix, obj.color)
 
 			self.rodfix.shape.draw(self.rod, self.rodfix, (0, 0, 0, 255))
-
 			pygame.image.save(self.screen, os.path.join(path, '0.png'))
 		#
 
