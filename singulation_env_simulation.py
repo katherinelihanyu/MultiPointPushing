@@ -141,7 +141,7 @@ class SingulationEnv:
 				fixture = body.CreatePolygonFixture(density=1, vertices=vertices.tolist(), friction=0.5)
 				self.objs.append(Polygon(body, [fixture], vertices, Colors[i]))
 			else:
-				max_iter = 1000
+				max_iter = 10000
 				while True:
 					max_iter -= 1
 					original_pos = np.array([np.random.uniform(-1.8, 1.8),np.random.uniform(-1.8, 1.8)]) + np.array(self.objs[-1].body.position)
@@ -272,6 +272,130 @@ class SingulationEnv:
 		self.centroid = compute_centroid(self.bounding_convex_hull.tolist())
 		self.bounding_circle_radius = math.sqrt(max((self.bounding_convex_hull - np.array(self.centroid))[:,0]**2 + (self.bounding_convex_hull - np.array(self.centroid))[:,1]**2))
 
+	def step_fast(self, start_pt, end_pt, path, display=False, check_reachable=True):
+		if display and not os.path.exists(path):
+			os.makedirs(path)
+
+		# display
+		if display:
+			self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), 0, 32)
+			pygame.display.iconify()
+
+			self.screen.fill((255, 255, 255, 255))
+
+			def my_draw_polygon(polygon, body, fixture, color):
+				vertices = [(body.transform * v) * PPM for v in polygon.vertices]
+				vertices = [(v[0], SCREEN_HEIGHT - v[1]) for v in vertices]
+
+				pygame.draw.polygon(self.screen, color, vertices, 0)
+				pygame.draw.polygon(self.screen, (0, 0, 0, 0), vertices, 5)
+
+			polygonShape.draw = my_draw_polygon
+
+			def my_draw_circle(circle, body, fixture, color):
+				position = body.transform * circle.pos * PPM
+				position = (position[0], SCREEN_HEIGHT - position[1])
+				pygame.draw.circle(self.screen, color, [int(
+					x) for x in position], int(circle.radius * PPM))
+
+			# Note: Python 3.x will enforce that pygame get the integers it requests,
+			#       and it will not convert from float.
+			circleShape.draw = my_draw_circle
+		#
+
+		start_pt = np.array(start_pt)
+		end_pt = np.array(end_pt)
+
+		self.rod = self.world.CreateKinematicBody(position=(start_pt[0], start_pt[1]), allowSleep=False)
+		self.rodfix = self.rod.CreatePolygonFixture(vertices=[(0.1, 0.1), (-0.1, 0.1), (-0.1, -0.1), (0.1, -0.1)])
+
+		vector = np.array(normalize(end_pt - np.array(self.rod.position)))
+
+		# reachability check
+		if check_reachable:
+			vertices_lst = [(0.0, 0.1), (0.0, -0.1), (-0.3, -0.1), (-0.3, 0.1)]
+
+			testrod = self.world.CreateKinematicBody(position=(start_pt[0], start_pt[1]), allowSleep=False)
+			testrodfix = testrod.CreatePolygonFixture(vertices=[rotatePt(pt, vector) for pt in vertices_lst])
+
+			while (np.count_nonzero(np.array([o.dist_rod(testrodfix, testrod) for o in self.objs]) <= 0) > 0):
+				# print(start_pt, [o.dist_rod(self.rodfix, self.rod) for o in self.objs])
+				start_pt -= 0.1 * vector
+				testrod.DestroyFixture(testrodfix)
+				self.world.DestroyBody(testrod)
+
+				testrod = self.world.CreateKinematicBody(position=(start_pt[0], start_pt[1]), allowSleep=False)
+				testrodfix = testrod.CreatePolygonFixture(vertices=[rotatePt(pt, vector) for pt in vertices_lst])
+
+			testrod.DestroyFixture(testrodfix)
+			self.world.DestroyBody(testrod)
+
+		self.rod.linearVelocity[0] = vector[0]
+		self.rod.linearVelocity[1] = vector[1]
+		self.rod.angularVelocity = 0.0
+
+		timestamp = 0
+
+		damping_factor = 1 - ((1 - 0.5) / 3)
+
+		# display
+		if display:
+			for obj in self.objs:
+				for fix in obj.fixtures:
+					fix.shape.draw(obj.body, fix, obj.color)
+
+			self.rodfix.shape.draw(self.rod, self.rodfix, (0, 0, 0, 255))
+			pygame.image.save(self.screen, os.path.join(path, '0.png'))
+		#
+
+		first_contact = -1
+
+		while (timestamp < 100):
+
+			if first_contact == -1:
+				for i in range(len(self.objs)):
+					if (self.objs[i].body.linearVelocity[0] ** 2 + self.objs[i].body.linearVelocity[1] ** 2 > 0.001):
+						first_contact = i
+
+			for obj in self.objs:
+				obj.body.linearVelocity[0] = obj.body.linearVelocity[0] * damping_factor
+				obj.body.linearVelocity[1] = obj.body.linearVelocity[1] * damping_factor
+				obj.body.angularVelocity = obj.body.angularVelocity * damping_factor
+
+			if (math.sqrt(np.sum((start_pt - np.array(self.rod.position)) ** 2)) < 4):
+
+				vector = normalize((end_pt + 1e-8) - (start_pt + 1e-8))
+				self.rod.linearVelocity[0] = vector[0]
+				self.rod.linearVelocity[1] = vector[1]
+
+			else:
+				self.rod.linearVelocity[0] = 0
+				self.rod.linearVelocity[1] = 0
+				break
+
+			self.world.Step(TIME_STEP, 8, 3)
+			timestamp += 1
+
+			# display
+			if display:
+				self.screen.fill((255, 255, 255, 255))
+
+				for obj in self.objs:
+					for fix in obj.fixtures:
+						fix.shape.draw(obj.body, fix, obj.color)
+
+				self.rodfix.shape.draw(self.rod, self.rodfix, (0, 0, 0, 255))
+				pygame.image.save(self.screen, os.path.join(path, str(timestamp) + '.png'))
+			#
+
+		# display
+		if display:
+			pygame.display.quit()
+			pygame.quit()
+		#
+
+		return first_contact
+
 	def step(self, start_pt, end_pt, path, display=False, check_reachable=True):
 		if display and not os.path.exists(path):
 			os.makedirs(path)
@@ -307,16 +431,16 @@ class SingulationEnv:
 		end_pt = np.array(end_pt)
 
 		self.rod = self.world.CreateKinematicBody(position=(start_pt[0], start_pt[1]), allowSleep=False)
-		self.rodfix = self.rod.CreateCircleFixture(radius=0.1)
+		self.rodfix = self.rod.CreatePolygonFixture(vertices=[(0.1, 0.1), (-0.1, 0.1), (-0.1, -0.1), (0.1, -0.1)])
 		vector = np.array(normalize(end_pt - np.array(start_pt)))
-
-		vertices_lst = [(0.0, 0.1), (0.0, -0.1), (-0.3, -0.1), (-0.3, 0.1)]
-
-		testrod = self.world.CreateKinematicBody(position=(start_pt[0], start_pt[1]), allowSleep=False)
-		testrodfix = testrod.CreatePolygonFixture(vertices=[rotatePt(pt, vector) for pt in vertices_lst])
 
 		# reachability check
 		if check_reachable:
+			vertices_lst = [(0.0, 0.1), (0.0, -0.1), (-0.3, -0.1), (-0.3, 0.1)]
+
+			testrod = self.world.CreateKinematicBody(position=(start_pt[0], start_pt[1]), allowSleep=False)
+			testrodfix = testrod.CreatePolygonFixture(vertices=[rotatePt(pt, vector) for pt in vertices_lst])
+
 			while (np.count_nonzero(np.array([o.dist_rod(testrodfix, testrod) for o in self.objs]) <= 0) > 0):
 				# print(start_pt, [o.dist_rod(self.rodfix, self.rod) for o in self.objs])
 				start_pt -= 0.1 * vector
@@ -326,11 +450,8 @@ class SingulationEnv:
 				testrod = self.world.CreateKinematicBody(position=(start_pt[0], start_pt[1]), allowSleep=False)
 				testrodfix = testrod.CreatePolygonFixture(vertices=[rotatePt(pt, vector) for pt in vertices_lst])
 
-		testrod.DestroyFixture(testrodfix)
-		self.world.DestroyBody(testrod)
-
-		self.rod = self.world.CreateKinematicBody(position=(start_pt[0], start_pt[1]), allowSleep=False)
-		self.rodfix = self.rod.CreateCircleFixture(radius=0.1)
+			testrod.DestroyFixture(testrodfix)
+			self.world.DestroyBody(testrod)
 
 		self.rod.linearVelocity[0] = vector[0]
 		self.rod.linearVelocity[1] = vector[1]
@@ -351,7 +472,7 @@ class SingulationEnv:
 		#
 
 		first_contact = -1
-
+		
 		while (timestamp < 100):
 
 			if first_contact == -1:
@@ -758,48 +879,6 @@ class SingulationEnv:
 			count += (sigmoid(min_dist*10) - 0.5) * 2
 		return count
 
-	def collect_data_summary(self, start_pt, end_pt, img_path=None, display=False, sum_path=None):
-		summary = {}
-		abs_start_pt = np.array(start_pt)
-		abs_end_pt = np.array(end_pt)
-		summary["start pt"] = abs_start_pt.tolist()
-		summary["end pt"] = abs_end_pt.tolist()
-		
-		for i in range(len(self.objs)):
-			summary[str(i)+" dist to pushing line"] = pointToLineDistance(abs_start_pt, abs_end_pt, self.objs[i].body.position)
-			summary[str(i)+" original pos"] = np.array(self.objs[i].body.position).tolist()
-			# print(abs_start_pt, abs_end_pt, self.objs[i].body.position)
-			summary[str(i)+" project dist"] = projectedPtToStartDistance(abs_start_pt, abs_end_pt, self.objs[i].body.position)
-			summary[str(i)+" vertices"] = np.array(self.objs[i].vertices).tolist()
-			summary[str(i)+" disk coverage"] = self.objs[i].disk_coverage
-
-		summary["avg centroid before push"] = self.avg_centroid()
-		summary["avg geometry before push"] = self.avg_geometry()
-		# summary["min centroid before push"] = self.min_centroid()
-		# summary["min geometry before push"] = self.min_geometry()
-		summary["count threshold before push"] = self.count_threshold()
-
-
-		first_contact = self.step(start_pt, end_pt,  path=img_path,display=display)
-
-		# if first_contact == -1:
-		# 	return
-
-		for i in range(len(self.objs)):
-			summary[str(i)+" change of pos"] = euclidean_dist(self.objs[i].body.position, self.objs[i].original_pos)
-		summary["avg centroid after push"] = self.avg_centroid()
-		summary["avg geometry after push"] = self.avg_geometry()
-		# summary["min centroid after push"] = self.min_centroid()
-		# summary["min geometry after push"] = self.min_geometry()
-		summary["count threshold after push"] = self.count_threshold()
-		summary["first contact object"] = first_contact
-		
-		if sum_path is not None:
-			with open(sum_path+'summary.json', 'w') as f:
-				json.dump(summary, f)
-		
-		return summary
-
 	def prune_best_summary(self, prune_method, sum_path, metric="avg centroid"):
 		pt_lst = prune_method(self)
 		best_pt = None
@@ -950,6 +1029,49 @@ class SingulationEnv:
 		
 		return summary
 
+	def collect_data_summary(self, start_pt, end_pt, img_path=None, display=False, sum_path=None):
+		summary = {}
+		abs_start_pt = np.array(start_pt)
+		abs_end_pt = np.array(end_pt)
+		summary["start pt"] = abs_start_pt.tolist()
+		summary["end pt"] = abs_end_pt.tolist()
+
+		for i in range(len(self.objs)):
+			summary[str(i) + " dist to pushing line"] = pointToLineDistance(abs_start_pt, abs_end_pt,
+																			self.objs[i].body.position)
+			summary[str(i) + " original pos"] = np.array(self.objs[i].body.position).tolist()
+			# print(abs_start_pt, abs_end_pt, self.objs[i].body.position)
+			summary[str(i) + " project dist"] = projectedPtToStartDistance(abs_start_pt, abs_end_pt,
+																		   self.objs[i].body.position)
+			summary[str(i) + " vertices"] = np.array(self.objs[i].vertices).tolist()
+			summary[str(i) + " disk coverage"] = self.objs[i].disk_coverage
+
+		summary["avg centroid before push"] = self.avg_centroid()
+		summary["avg geometry before push"] = self.avg_geometry()
+		# summary["min centroid before push"] = self.min_centroid()
+		# summary["min geometry before push"] = self.min_geometry()
+		summary["count threshold before push"] = self.count_threshold()
+
+		first_contact = self.step(start_pt, end_pt, path=img_path, display=display)
+
+		# if first_contact == -1:
+		# 	return
+
+		for i in range(len(self.objs)):
+			summary[str(i) + " change of pos"] = euclidean_dist(self.objs[i].body.position, self.objs[i].original_pos)
+		summary["avg centroid after push"] = self.avg_centroid()
+		summary["avg geometry after push"] = self.avg_geometry()
+		# summary["min centroid after push"] = self.min_centroid()
+		# summary["min geometry after push"] = self.min_geometry()
+		summary["count threshold after push"] = self.count_threshold()
+		summary["first contact object"] = first_contact
+
+		if sum_path is not None:
+			with open(os.path.join(sum_path, 'summary.json'), 'w') as f:
+				json.dump(summary, f)
+
+		return summary
+
 	def reset(self):
 		if self.rod:
 			self.rod.DestroyFixture(self.rodfix)
@@ -1036,10 +1158,20 @@ class SingulationEnv:
 
 		return 1
 
+	def save_env(self, sum_path=None):
+		summary = {}
+		summary["num_objects"] = len(self.objs)
+
+		for i in range(len(self.objs)):
+			summary[str(i) + " original pos"] = np.array(self.objs[i].body.position).tolist()
+			summary[str(i) + " vertices"] = np.array(self.objs[i].vertices).tolist()
+		if sum_path != None:
+			with open(os.path.join(sum_path, 'env.json'), 'w') as f:
+				json.dump(summary, f)
+		return summary
+
 	def load_env(self, dic):
-		assert (len(dic) - 13) % 6 == 0
-		num_obj = (len(dic) - 13) // 6
-		for i in range(num_obj):
+		for i in range(dic["num_objects"]):
 			original_pos = np.array(dic[str(i)+" original pos"])
 			vertices = np.array(dic[str(i)+" vertices"])
 			body = self.world.CreateDynamicBody(position=original_pos.tolist(), allowSleep=False)
@@ -1099,42 +1231,25 @@ class SingulationEnv:
 				json.dump(data_sum, f)
 		return data_sum
 
-	def collect_sequential_sample(self, prune_method, max_step=5, metric="count threshold", sum_path=None):
-		# data_sum = []
-		action = None
-		starting_pos = self.save_curr_position()
-		for i in range(max_step):
-			curr_pos = self.save_curr_position()
-			best_pts = self.select_random(prune_method)
-			if action == None:
-				action = best_pts
-			# best_pts = self.prune_best(prune_method, metric, curr_pos)
-			self.load_position(curr_pos)
-			curr_sum = self.collect_data_summary(best_pts[0], best_pts[1], None)
-			# data_sum.append(curr_sum)
-			# print(metric, "after push:", curr_sum[metric +" after push"], "before push:", curr_sum[metric + " before push"])
-		# return data_sum[-1][metric +" after push"], data_sum[-1][metric + " before push"]
-		self.load_position(starting_pos)
-		if sum_path is not None:
-			with open(os.path.join(sum_path, "sequential_prune_planning.json"), 'w') as f:
-				json.dump(curr_sum, f)
-		return curr_sum[metric +" after push"], action
 
-	def best_sequential_sample(self,num_trials, prune_method, max_step=5, metric="count threshold", sum_path=None):
+	def best_sequential_sample(self,num_samples, prune_method, max_step=5, metric="count threshold", sum_path=None):
 		best_result = 0
 		best_action = None
-		for i in range(num_trials):
-			result, action = self.collect_sequential_sample(prune_method, max_step, metric, sum_path)
+		pt_lst = prune_method(self)
+		summary = self.save_env()
+		for i in range(num_samples):
+			result, action = collect_sequential_sample(pt_lst, summary, max_step, metric, sum_path)
 			if result > best_result:
 				best_result = result
 				best_action = action
 		return best_result, best_action
 
-	def prune_best(self, prune_method, metric="count threshold", position=None, sum_path=None):
+	def prune_best(self, prune_method, metric="count threshold", position=None):
 		pt_lst = prune_method(self)
 		best_pt = None
 		# if metric == "avg centroid" or metric == "avg geometry":
 		best_sep = -1e2
+		print("len(pt_lst)", len(pt_lst))
 		for pts in pt_lst:
 			if position is None:
 				self.reset()
@@ -1143,14 +1258,12 @@ class SingulationEnv:
 			summary = self.collect_data_summary(pts[0], pts[1], None)
 			if summary[metric +" after push"] - summary[metric + " before push"] >= best_sep:
 				best_pt = pts
-				if position is None:
-					self.reset()
-				else:
-					self.load_position(position)
 				best_sep = summary[metric +" after push"] - summary[metric + " before push"]
-		
-		# if best_pt is not None:
-		self.reset()
+
+		if position is None:
+			self.reset()
+		else:
+			self.load_position(position)
 		# 	return self.collect_data_summary(best_pt[0], best_pt[1], "/", sum_path=sum_path)
 		return best_pt
 
@@ -1158,13 +1271,13 @@ class SingulationEnv:
 		pt_lst = prune_method(self)
 		return random.choice(pt_lst)
 
-	def count_threshold_data_generation(self, max_step=4):
+	def count_threshold_data_generation(self):
 		input_data = []
 		item_label = []
 		action_label = []
 		# data_sum = []
 		curr_pos = self.save_curr_position()
-		best_pts = self.select_random(com_only)
+		best_pts = self.select_random(no_prune)
 		if best_pts is None:
 			return [], [], []
 		best_summary = self.collect_data_summary(best_pts[0], best_pts[1], None)
@@ -1264,6 +1377,26 @@ def render_images(data_folder, num_objects):
 	test_env.visualize(os.path.join(data_folder, 'prediction.png'))
 	test_env.reset_env_five_objects(next_state)
 	test_env.visualize(os.path.join(data_folder, 'label.png'))
+
+def collect_sequential_sample(pt_lst, summary, max_step=5, metric="count threshold",  sum_path=None):
+	# data_sum = []
+	action = None
+	for i in range(max_step):
+		best_pts = random.choice(pt_lst)
+		env = SingulationEnv()
+		env.load_env(summary)
+		if action == None:
+			action = best_pts
+		# best_pts = self.prune_best(prune_method, metric, curr_pos)
+		# curr_sum = self.collect_data_summary(best_pts[0], best_pts[1], img_path="./data/sequential_sample%d_step%d"%(sample_index,i), display=True)
+		curr_sum = env.collect_data_summary(best_pts[0], best_pts[1])
+		# data_sum.append(curr_sum)
+		# print(metric, "after push:", curr_sum[metric +" after push"], "before push:", curr_sum[metric + " before push"])
+	# return data_sum[-1][metric +" after push"], data_sum[-1][metric + " before push"]
+	if sum_path is not None:
+		with open(os.path.join(sum_path, "sequential_prune_planning.json"), 'w') as f:
+			json.dump(curr_sum, f)
+	return curr_sum[metric +" after push"], action
 
 if __name__ == "__main__":
 	data_folder="/Users/katherineli/Desktop/MultiPointPushing/data/5objects"
