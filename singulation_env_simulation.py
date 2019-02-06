@@ -1051,6 +1051,7 @@ class SingulationEnv:
 		# summary["min centroid before push"] = self.min_centroid()
 		# summary["min geometry before push"] = self.min_geometry()
 		summary["count threshold before push"] = self.count_threshold()
+		summary["count soft threshold before push"] = self.count_soft_threshold()
 
 		first_contact = self.step(start_pt, end_pt, path=img_path, display=display)
 
@@ -1064,6 +1065,7 @@ class SingulationEnv:
 		# summary["min centroid after push"] = self.min_centroid()
 		# summary["min geometry after push"] = self.min_geometry()
 		summary["count threshold after push"] = self.count_threshold()
+		summary["count soft threshold after push"] = self.count_soft_threshold()
 		summary["first contact object"] = first_contact
 
 		if sum_path is not None:
@@ -1232,7 +1234,7 @@ class SingulationEnv:
 		return data_sum
 
 
-	def best_sequential_sample(self,num_samples, prune_method, max_step=5, metric="count threshold", sum_path=None):
+	def best_sequential_sample(self, num_samples, prune_method, max_step=5, metric="count soft threshold", sum_path=None):
 		best_result = 0
 		best_action = None
 		pt_lst = prune_method(self)
@@ -1378,7 +1380,7 @@ def render_images(data_folder, num_objects):
 	test_env.reset_env_five_objects(next_state)
 	test_env.visualize(os.path.join(data_folder, 'label.png'))
 
-def collect_sequential_sample(pt_lst, summary, max_step=5, metric="count threshold",  sum_path=None):
+def collect_sequential_sample(pt_lst, summary, max_step=5, metric="count soft threshold",  sum_path=None):
 	# data_sum = []
 	action = None
 	for i in range(max_step):
