@@ -1232,7 +1232,7 @@ class SingulationEnv:
 		return data_sum
 
 
-	def best_sequential_sample(self,num_samples, prune_method, max_step=5, metric="count threshold", sum_path=None):
+	def best_sequential_sample(self, num_samples, prune_method, max_step=5, metric="count threshold", sum_path=None):
 		best_result = 0
 		best_action = None
 		pt_lst = prune_method(self)
