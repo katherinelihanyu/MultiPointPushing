@@ -2,6 +2,8 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 
+def sigmoid(x):
+  return 1 / (1 + math.exp(-x))
 
 # Function to know if we have a CCW turn
 def CCW(p1, p2, p3):
