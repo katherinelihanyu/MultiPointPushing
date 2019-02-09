@@ -1238,13 +1238,28 @@ class SingulationEnv:
 		best_result = 0
 		best_action = None
 		pt_lst = prune_method(self)
-		summary = self.save_env()
+		position = self.save_curr_position()
 		for i in range(num_samples):
-			result, action = collect_sequential_sample(pt_lst, summary, max_step, metric, sum_path)
+			result, action = self.collect_sequential_sample(i, pt_lst, position, max_step, metric, sum_path)
 			if result > best_result:
 				best_result = result
 				best_action = action
 		return best_result, best_action
+
+	def collect_sequential_sample(self, sample_index, pt_lst, position, max_step=5, metric="count soft threshold", sum_path=None):
+		# data_sum = []
+		action = None
+		self.load_position(position)
+		for i in range(max_step):
+			best_pts = random.choice(pt_lst)
+			if action == None:
+				action = best_pts
+			curr_sum = self.collect_data_summary(best_pts[0], best_pts[1], img_path="./data/collect_sequential_sample%d"%i, display=sample_index%10==0)
+		self.load_position(position)
+		if sum_path is not None:
+			with open(os.path.join(sum_path, "sequential_prune_planning.json"), 'w') as f:
+				json.dump(curr_sum, f)
+		return curr_sum[metric + " after push"], action
 
 	def prune_best(self, prune_method, metric="count threshold", position=None):
 		pt_lst = prune_method(self)
@@ -1252,12 +1267,14 @@ class SingulationEnv:
 		# if metric == "avg centroid" or metric == "avg geometry":
 		best_sep = -1e2
 		print("len(pt_lst)", len(pt_lst))
-		for pts in pt_lst:
+		for i in range(100):
+			pts = pt_lst[i]
 			if position is None:
 				self.reset()
 			else:
 				self.load_position(position)
-			summary = self.collect_data_summary(pts[0], pts[1], None)
+			summary = self.collect_data_summary(pts[0], pts[1], img_path="./data/sequential_greedy_C%d" % i, display=i==69)
+			# summary = self.collect_data_summary(pts[0], pts[1], img_path="./data/sequential_greedy_D%d" % i, display=i==69)
 			if summary[metric +" after push"] - summary[metric + " before push"] >= best_sep:
 				best_pt = pts
 				best_sep = summary[metric +" after push"] - summary[metric + " before push"]
@@ -1266,7 +1283,7 @@ class SingulationEnv:
 			self.reset()
 		else:
 			self.load_position(position)
-		# 	return self.collect_data_summary(best_pt[0], best_pt[1], "/", sum_path=sum_path)
+
 		return best_pt
 
 	def select_random(self, prune_method):
@@ -1379,26 +1396,6 @@ def render_images(data_folder, num_objects):
 	test_env.visualize(os.path.join(data_folder, 'prediction.png'))
 	test_env.reset_env_five_objects(next_state)
 	test_env.visualize(os.path.join(data_folder, 'label.png'))
-
-def collect_sequential_sample(pt_lst, summary, max_step=5, metric="count soft threshold",  sum_path=None):
-	# data_sum = []
-	action = None
-	for i in range(max_step):
-		best_pts = random.choice(pt_lst)
-		env = SingulationEnv()
-		env.load_env(summary)
-		if action == None:
-			action = best_pts
-		# best_pts = self.prune_best(prune_method, metric, curr_pos)
-		# curr_sum = self.collect_data_summary(best_pts[0], best_pts[1], img_path="./data/sequential_sample%d_step%d"%(sample_index,i), display=True)
-		curr_sum = env.collect_data_summary(best_pts[0], best_pts[1])
-		# data_sum.append(curr_sum)
-		# print(metric, "after push:", curr_sum[metric +" after push"], "before push:", curr_sum[metric + " before push"])
-	# return data_sum[-1][metric +" after push"], data_sum[-1][metric + " before push"]
-	if sum_path is not None:
-		with open(os.path.join(sum_path, "sequential_prune_planning.json"), 'w') as f:
-			json.dump(curr_sum, f)
-	return curr_sum[metric +" after push"], action
 
 if __name__ == "__main__":
 	data_folder="/Users/katherineli/Desktop/MultiPointPushing/data/5objects"

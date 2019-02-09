@@ -32,7 +32,7 @@ def greedy_sequential(test, num_steps, metric="count soft threshold", save_img =
             print("best_pts is None")
             break
         if save_img:
-            best_summary = test.collect_data_summary(best_pts[0], best_pts[1], img_path="./data/sequential_greedy_%d"%i, display=True)
+            best_summary = test.collect_data_summary(best_pts[0], best_pts[1], img_path="./data/sequential_greedy_A%d"%i, display=True)
         else:
             best_summary = test.collect_data_summary(best_pts[0], best_pts[1])
         best_dist = best_summary[metric + " after push"] - best_summary[metric + " before push"]
@@ -69,18 +69,34 @@ def plot(num_samples_lst, means, stds, num_objects,num_trials,num_steps,path):
 
 
 num_objects = 10
-num_trials = 20
-num_steps = 3
+num_trials = 1
+num_steps = 1
+num_samples = 50
 
 test = SingulationEnv()
-test.create_random_env(num_objects)
-summary = test.save_env()
-best_result = sampling(test, num_samples=num_samples, num_steps=num_steps, metric="count soft threshold", timeit=True)
-print("sampling with %d samples, result:"%num_samples, best_result)
-test = SingulationEnv()
-test.load_env(summary)
+while True:
+    try:
+        test.create_random_env(num_objects)
+        break
+    except:
+        pass
+# summary = test.save_env()
+# best_result = sampling(test, num_samples=num_samples, num_steps=num_steps, metric="count soft threshold", timeit=True)
+# print("sampling with %d samples, result:"%num_samples, best_result)
+# test = SingulationEnv()
+# test.load_env(summary)
 best_result = greedy_sequential(test=test, num_steps=num_steps, metric="count soft threshold", save_img = True)
 print("greedy result:", best_result)
+# metric = "count soft threshold"
+# curr_pos = test.save_curr_position()
+# best_pts = test.prune_best(prune_method=no_prune, metric=metric, position=curr_pos)
+# best_summary = test.collect_data_summary(best_pts[0], best_pts[1], img_path="./data/sequential_greedy_A1", display=True)
+# best_summary = test.collect_data_summary(best_pts[0], best_pts[1], img_path="./data/sequential_greedy_A2", display=True)
+# test.load_position(curr_pos)
+# # best_pts = test.prune_best(prune_method=no_prune, metric="count soft threshold", position=curr_pos)
+# best_summary = test.collect_data_summary(best_pts[0], best_pts[1], img_path="./data/sequential_greedy_B1", display=True)
+# best_summary = test.collect_data_summary(best_pts[0], best_pts[1], img_path="./data/sequential_greedy_B2", display=True)
+# print(metric + " after push", best_summary[metric + " after push"])
 
 # num_samples_lst = [10, 150, 300, 450, 600, 750, 900, 1050, 1200]
 # returns = []
