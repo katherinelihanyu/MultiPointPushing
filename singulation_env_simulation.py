@@ -7,6 +7,7 @@ import pygame
 from pygame.locals import (QUIT, KEYDOWN, K_ESCAPE)
 import numpy as np
 import pickle
+import imageio
 
 import Box2D  
 from Box2D.b2 import (world, polygonShape, circleShape, staticBody, dynamicBody, kinematicBody)
@@ -114,6 +115,14 @@ class SingulationEnv:
 		self.bounding_convex_hull = np.array([])
 		self.centroid = (0, 0)
 		self.bounding_circle_radius = 0
+
+	def create_random_env_wrapper(self, num_objs=3, group=0):
+		while True:
+			try:
+				self.create_random_env(num_objs,group)
+				return
+			except:
+				pass
 
 	def create_random_env(self, num_objs=3, group=0):
 		assert num_objs >= 1
@@ -397,8 +406,11 @@ class SingulationEnv:
 		return first_contact
 
 	def step(self, start_pt, end_pt, path, display=False, check_reachable=True):
-		if display and not os.path.exists(path):
-			os.makedirs(path)
+		if display:
+			images = []
+			if not os.path.exists(path):
+				os.makedirs(path)
+
 
 		# display
 		if display:
@@ -468,7 +480,9 @@ class SingulationEnv:
 					fix.shape.draw(obj.body, fix, obj.color)
 
 			self.rodfix.shape.draw(self.rod, self.rodfix, (0, 0, 0, 255))
-			pygame.image.save(self.screen, os.path.join(path, '0.png'))
+			img_path = os.path.join(path, '0.png')
+			pygame.image.save(self.screen, img_path)
+			images.append(imageio.imread(img_path))
 		#
 
 		first_contact = -1
@@ -507,13 +521,16 @@ class SingulationEnv:
 						fix.shape.draw(obj.body, fix, obj.color)
 
 				self.rodfix.shape.draw(self.rod, self.rodfix, (0, 0, 0, 255))
-				pygame.image.save(self.screen, os.path.join(path, str(timestamp) + '.png'))
+				img_path = os.path.join(path, str(timestamp) + '.png')
+				pygame.image.save(self.screen, img_path)
+				images.append(imageio.imread(img_path))
 		#
 
 		# display
 		if display:
 			pygame.display.quit()
 			pygame.quit()
+			imageio.mimsave(os.path.join(path, 'push.gif'), images)
 		#
 
 		return first_contact
@@ -875,7 +892,6 @@ class SingulationEnv:
 					pointA, pointB, distance, iterations = Box2D.b2Distance(shapeA=shape1, shapeB=shape2, transformA=transform1, transformB=transform2)
 					if distance < min_dist:
 						min_dist = distance
-			# print(min_dist, (sigmoid(min_dist*10) - 0.5) * 2)
 			count += (sigmoid(min_dist*10) - 0.5) * 2
 		return count
 
@@ -1234,16 +1250,29 @@ class SingulationEnv:
 		return data_sum
 
 
-	def best_sequential_sample(self, num_samples, prune_method, max_step=5, metric="count soft threshold", sum_path=None):
+	def best_sequential_sample(self, num_samples, prune_method, reuse, max_step, data_path, reuse_path=None, metric="count soft threshold", open_loop=False):
 		best_result = 0
 		best_action = None
-		pt_lst = prune_method(self)
-		summary = self.save_env()
+		best_sample = None
+		first_step_pt_lst = prune_method(self)
+		complete_pt_lst = list(first_step_pt_lst)
+		# random.shuffle(pt_lst)
+		summary = self.save_env(sum_path=data_path)
 		for i in range(num_samples):
-			result, action = collect_sequential_sample(pt_lst, summary, max_step, metric, sum_path)
+			sample_path = os.path.join(data_path, "sample"+str(i))
+			if not os.path.exists(sample_path):
+				os.makedirs(sample_path)
+			result, action = collect_sequential_sample(first_step_pt_lst, complete_pt_lst, summary, reuse, max_step, sample_path, metric, open_loop)
 			if result > best_result:
 				best_result = result
 				best_action = action
+				best_sample = i
+		if reuse:
+			with open(os.path.join(reuse_path, "best_sample.json"), 'w') as f:
+				json.dump({"best_sample": best_sample}, f)
+		else:
+			with open(os.path.join(data_path,"best_sample.json"), 'w') as f:
+				json.dump({"best_sample": best_sample}, f)
 		return best_result, best_action
 
 	def prune_best(self, prune_method, metric="count threshold", position=None):
@@ -1380,27 +1409,68 @@ def render_images(data_folder, num_objects):
 	test_env.reset_env_five_objects(next_state)
 	test_env.visualize(os.path.join(data_folder, 'label.png'))
 
-def collect_sequential_sample(pt_lst, summary, max_step=5, metric="count soft threshold",  sum_path=None):
-	# data_sum = []
-	action = None
-	for i in range(max_step):
-		best_pts = random.choice(pt_lst)
+def collect_sequential_sample(first_step_pt_lst, complete_pt_lst, summary, reuse, max_step, sample_path, metric="count soft threshold", open_loop=False):
+	# first_step_pt_lst are popped, but complete_pt_lst is not
+	actions = []
+	if reuse:
+		with open(os.path.join(sample_path, "push_summary.json"), "r") as read_file:
+			result = json.load(read_file)
+		if open_loop:
+			actions.append([result["first push start pt"], result["first push end pt"]])
+			actions.append([result["second push start pt"], result["second push end pt"]])
+			actions.append([result["third push start pt"], result["third push end pt"]])
+		else:
+			action = [result["first push start pt"], result["first push end pt"]]
+	else:
+		# step 0
+		action = first_step_pt_lst.pop()
+		actions.append(action)
 		env = SingulationEnv()
 		env.load_env(summary)
-		if action == None:
-			action = best_pts
-		# best_pts = self.prune_best(prune_method, metric, curr_pos)
-		# curr_sum = self.collect_data_summary(best_pts[0], best_pts[1], img_path="./data/sequential_sample%d_step%d"%(sample_index,i), display=True)
-		curr_sum = env.collect_data_summary(best_pts[0], best_pts[1])
-		# data_sum.append(curr_sum)
-		# print(metric, "after push:", curr_sum[metric +" after push"], "before push:", curr_sum[metric + " before push"])
-	# return data_sum[-1][metric +" after push"], data_sum[-1][metric + " before push"]
-	if sum_path is not None:
-		with open(os.path.join(sum_path, "sequential_prune_planning.json"), 'w') as f:
+		curr_sum = env.collect_data_summary(action[0], action[1])
+		step_path = os.path.join(sample_path, "sample_step0")
+		if not os.path.exists(step_path):
+			os.makedirs(step_path)
+		with open(os.path.join(step_path, "summary.json"), 'w') as f:
 			json.dump(curr_sum, f)
-	return curr_sum[metric +" after push"], action
+		# step 1, ..., max_step-1
+		for i in range(1, max_step):
+			best_pts = random.choice(complete_pt_lst)
+			actions.append(best_pts)
+			env = SingulationEnv()
+			env.load_env(summary)
+			curr_sum = env.collect_data_summary(best_pts[0], best_pts[1])
+			step_path = os.path.join(sample_path, "sample_step"+str(i))
+			if not os.path.exists(step_path):
+				os.makedirs(step_path)
+			with open(os.path.join(step_path, "summary.json"), 'w') as f:
+				json.dump(curr_sum, f)
+		result = {}
+		result[metric +" after push"] = curr_sum[metric +" after push"]
+		result["first push start pt"] = action[0].tolist()
+		result["first push end pt"] = action[1].tolist()
+		if len(actions) >1:
+			result["second push start pt"] = actions[1][0].tolist()
+			result["second push end pt"] = actions[1][1].tolist()
+		if len(actions)> 2:
+			result["third push start pt"] = actions[2][0].tolist()
+			result["third push end pt"] = actions[2][1].tolist()
+		with open(os.path.join(sample_path, "push_summary.json"), 'w') as f:
+			json.dump(result, f)
+	if open_loop:
+		return result[metric +" after push"], actions
+	else:
+		return result[metric + " after push"], action
+
+def create_initial_envs(num_trials, num_objects, data_path):
+	for i in range(num_trials):
+		path = os.path.join(data_path, "env" + str(i))
+		if not os.path.exists(path):
+			os.makedirs(path)
+		env = SingulationEnv()
+		env.create_random_env_wrapper(num_objects)
+		env.save_env(sum_path=path)
 
 if __name__ == "__main__":
-	data_folder="/Users/katherineli/Desktop/MultiPointPushing/data/5objects"
-	# generate_data(data_folder,batch_size=100000,num_objects=5)
-	render_images(data_folder, num_objects=5)
+	data_path = "/nfs/diskstation/katherineli/sampling"
+	create_initial_envs(50,10,data_path)
