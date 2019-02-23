@@ -1442,6 +1442,8 @@ def collect_sequential_sample(complete_pt_lst, summary, reuse, max_step, sample_
 			best_pts = random.choice(complete_pt_lst)
 			actions.append(best_pts)
 			curr_sum = env.collect_data_summary(best_pts[0], best_pts[1])
+			if i == 0:
+				after_step0 = curr_sum[metric + " after push"]
 			step_path = os.path.join(sample_path, "sample_step"+str(i))
 			if not os.path.exists(step_path):
 				os.makedirs(step_path)
