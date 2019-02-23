@@ -1461,7 +1461,7 @@ def collect_sequential_sample(complete_pt_lst, summary, reuse, max_step, sample_
 			result["third push end pt"] = actions[2][1].tolist()
 		with open(os.path.join(sample_path, "push_summary.json"), 'w') as f:
 			json.dump(result, f)
-	return result[metric + " after push"], action, result[metric +" before push"], after_step0
+	return result[metric + " after push"], actions[0], result[metric +" before push"], after_step0
 
 def create_initial_envs(num_trials, num_objects, data_path):
 	for i in range(num_trials):
