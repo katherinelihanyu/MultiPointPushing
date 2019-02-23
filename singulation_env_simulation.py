@@ -1426,6 +1426,7 @@ def collect_sequential_sample(complete_pt_lst, summary, reuse, max_step, sample_
 	# first_step_pt_lst are popped, but complete_pt_lst is not
 	actions = []
 	after_step0 = None
+	before_step0 = None
 	if reuse:
 		with open(os.path.join(sample_path, "push_summary.json"), "r") as read_file:
 			result = json.load(read_file)
@@ -1438,19 +1439,20 @@ def collect_sequential_sample(complete_pt_lst, summary, reuse, max_step, sample_
 	else:
 		env = SingulationEnv()
 		env.load_env(summary)
+		result = {}
 		for i in range(max_step):
 			best_pts = random.choice(complete_pt_lst)
 			actions.append(best_pts)
 			curr_sum = env.collect_data_summary(best_pts[0], best_pts[1])
 			if i == 0:
 				after_step0 = curr_sum[metric + " after push"]
+				before_step0 = curr_sum[metric + " before push"]
+				result[metric + " before push"] = curr_sum[metric + " before push"]
 			step_path = os.path.join(sample_path, "sample_step"+str(i))
 			if not os.path.exists(step_path):
 				os.makedirs(step_path)
 			with open(os.path.join(step_path, "summary.json"), 'w') as f:
 				json.dump(curr_sum, f)
-		result = {}
-		result[metric + " before push"] = curr_sum[metric + " before push"]
 		result[metric + " after push"] = curr_sum[metric + " after push"]
 		result["first push start pt"] = actions[0][0].tolist()
 		result["first push end pt"] = actions[0][1].tolist()
@@ -1463,7 +1465,7 @@ def collect_sequential_sample(complete_pt_lst, summary, reuse, max_step, sample_
 			result["third push end pt"] = actions[2][1].tolist()
 		with open(os.path.join(sample_path, "push_summary.json"), 'w') as f:
 			json.dump(result, f)
-	return result[metric + " after push"], actions[0], result[metric +" before push"], after_step0
+	return result[metric + " after push"], actions[0], before_step0, after_step0
 
 def create_initial_envs(num_trials, num_objects, data_path):
 	for i in range(num_trials):
