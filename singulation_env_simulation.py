@@ -1176,6 +1176,10 @@ class SingulationEnv:
 
 		return 1
 
+	def save_env_obj(self, path):
+		with open(path, 'wb') as f:
+			pickle.dump(self, f)
+
 	def save_env(self, sum_path=None):
 		summary = {}
 		summary["num_objects"] = len(self.objs)
@@ -1258,28 +1262,34 @@ class SingulationEnv:
 		complete_pt_lst = list(first_step_pt_lst)
 		# random.shuffle(pt_lst)
 		summary = self.save_env(sum_path=data_path)
+		best_before = None
+		best_after_step0 = None
 		for i in range(num_samples):
 			sample_path = os.path.join(data_path, "sample"+str(i))
 			if not os.path.exists(sample_path):
 				os.makedirs(sample_path)
-			result, action = collect_sequential_sample(first_step_pt_lst, complete_pt_lst, summary, reuse, max_step, sample_path, metric, open_loop)
+			result, action, before, after_step0 = collect_sequential_sample(first_step_pt_lst, complete_pt_lst, summary, reuse, max_step, sample_path, metric, open_loop)
 			if result > best_result:
 				best_result = result
 				best_action = action
 				best_sample = i
+				best_before = before
+				best_after_step0 = after_step0
 		if reuse:
 			with open(os.path.join(reuse_path, "best_sample.json"), 'w') as f:
 				json.dump({"best_sample": best_sample}, f)
 		else:
 			with open(os.path.join(data_path,"best_sample.json"), 'w') as f:
 				json.dump({"best_sample": best_sample}, f)
-		return best_result, best_action
+		return best_result, best_action, best_before, best_after_step0
 
 	def prune_best(self, prune_method, metric="count threshold", position=None):
 		pt_lst = prune_method(self)
 		best_pt = None
 		# if metric == "avg centroid" or metric == "avg geometry":
 		best_sep = -1e2
+		best_before = None
+		best_after = None
 		print("len(pt_lst)", len(pt_lst))
 		for pts in pt_lst:
 			if position is None:
@@ -1290,12 +1300,16 @@ class SingulationEnv:
 			if summary[metric +" after push"] - summary[metric + " before push"] >= best_sep:
 				best_pt = pts
 				best_sep = summary[metric +" after push"] - summary[metric + " before push"]
+				best_before = summary[metric + " before push"]
+				best_after = summary[metric +" after push"]
 
 		if position is None:
 			self.reset()
 		else:
 			self.load_position(position)
-		# 	return self.collect_data_summary(best_pt[0], best_pt[1], "/", sum_path=sum_path)
+		print("predicted")
+		print(metric + " before push", best_before)
+		print(metric + " after push", best_after)
 		return best_pt
 
 	def select_random(self, prune_method):
@@ -1412,6 +1426,7 @@ def render_images(data_folder, num_objects):
 def collect_sequential_sample(first_step_pt_lst, complete_pt_lst, summary, reuse, max_step, sample_path, metric="count soft threshold", open_loop=False):
 	# first_step_pt_lst are popped, but complete_pt_lst is not
 	actions = []
+	after_step0 = None
 	if reuse:
 		with open(os.path.join(sample_path, "push_summary.json"), "r") as read_file:
 			result = json.load(read_file)
@@ -1428,6 +1443,7 @@ def collect_sequential_sample(first_step_pt_lst, complete_pt_lst, summary, reuse
 		env = SingulationEnv()
 		env.load_env(summary)
 		curr_sum = env.collect_data_summary(action[0], action[1])
+		after_step0 = curr_sum[metric + " after push"]
 		step_path = os.path.join(sample_path, "sample_step0")
 		if not os.path.exists(step_path):
 			os.makedirs(step_path)
@@ -1446,9 +1462,11 @@ def collect_sequential_sample(first_step_pt_lst, complete_pt_lst, summary, reuse
 			with open(os.path.join(step_path, "summary.json"), 'w') as f:
 				json.dump(curr_sum, f)
 		result = {}
-		result[metric +" after push"] = curr_sum[metric +" after push"]
+		result[metric + " before push"] = curr_sum[metric + " before push"]
+		result[metric + " after push"] = curr_sum[metric + " after push"]
 		result["first push start pt"] = action[0].tolist()
 		result["first push end pt"] = action[1].tolist()
+		result[metric + " after this step"] = after_step0
 		if len(actions) >1:
 			result["second push start pt"] = actions[1][0].tolist()
 			result["second push end pt"] = actions[1][1].tolist()
@@ -1457,10 +1475,7 @@ def collect_sequential_sample(first_step_pt_lst, complete_pt_lst, summary, reuse
 			result["third push end pt"] = actions[2][1].tolist()
 		with open(os.path.join(sample_path, "push_summary.json"), 'w') as f:
 			json.dump(result, f)
-	if open_loop:
-		return result[metric +" after push"], actions
-	else:
-		return result[metric + " after push"], action
+	return result[metric + " after push"], action, result[metric +" before push"], after_step0
 
 def create_initial_envs(num_trials, num_objects, data_path):
 	for i in range(num_trials):

@@ -3,6 +3,7 @@ import datetime
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
+import random
 
 from helper import *
 from policies import *
@@ -24,15 +25,20 @@ def sampling_every_step(summary, data_path, num_samples, num_steps, reuse, reuse
             reuse_step_path = os.path.join(reuse_path, "actual_step"+str(i))
             if not os.path.exists(reuse_step_path):
                 os.makedirs(reuse_step_path)
-        best_result, best_pts = env.best_sequential_sample(num_samples, no_prune, reuse=reuse, max_step=num_steps-i,
+        best_result, best_pts, best_before, best_after_step0 = env.best_sequential_sample(num_samples, no_prune, reuse=reuse, max_step=num_steps-i,
                                                            data_path=actual_step_path, reuse_path=reuse_step_path, metric=metric)
+        print("sampled")
+        print(metric, "before push", best_before)
+        print(metric, "after push", best_after_step0)
+        print(metric, "total reward", best_result)
         if reuse:
             best_summary = env.collect_data_summary(best_pts[0], best_pts[1],
                                                     img_path=os.path.join(reuse_step_path, "render"), display=False,
                                                     sum_path=reuse_step_path)
         else:
             best_summary = env.collect_data_summary(best_pts[0], best_pts[1], img_path=os.path.join(actual_step_path, "render"), display=True, sum_path=actual_step_path)
-        print(metric + " before push", best_summary[metric + " before push"], "projected reward at step %d: %.2f" % (i + 3, best_result))
+        print("actual")
+        print(metric + " before push", best_summary[metric + " before push"])
         print(metric + " after push", best_summary[metric + " after push"])
         if timeit:
             print("sampling step %d took"%i, datetime.datetime.now().replace(microsecond=0) - cur_time)
@@ -49,16 +55,23 @@ def sampling_open_loop(summary, data_path, num_samples, num_steps, reuse, metric
     actual_step_path = os.path.join(data_path, "samples")
     if not os.path.exists(actual_step_path):
         os.makedirs(actual_step_path)
-    best_result, actions = env.best_sequential_sample(num_samples, no_prune, reuse=reuse, max_step=num_steps,
+    best_result, actions, best_before, best_after_step0  = env.best_sequential_sample(num_samples, no_prune, reuse=reuse, max_step=num_steps,
                                                    data_path=actual_step_path, metric=metric, open_loop=True)
+    print("sampled")
+    print(metric, "before push", best_before)
+    print(metric, "after push", best_after_step0)
+    print(metric, "total reward", best_result)
     for i in range(len(actions)):
         best_pts = actions[i]
         print("step", i)
         actual_step_path = os.path.join(data_path, "actual_step" + str(i))
         if not os.path.exists(actual_step_path):
             os.makedirs(actual_step_path)
+        print("best_pts[0]", best_pts[0])
+        print("best_pts[1]", best_pts[1])
         best_summary = env.collect_data_summary(best_pts[0], best_pts[1], img_path=actual_step_path, display=False, sum_path=actual_step_path)
-        print(metric + " before push", best_summary[metric + " before push"], "projected reward at step %d: %.2f" % (i + 3, best_result))
+        print("actual")
+        print(metric + " before push", best_summary[metric + " before push"])
         print(metric + " after push", best_summary[metric + " after push"])
         if timeit:
             print("sampling step %d took"%i, datetime.datetime.now().replace(microsecond=0) - cur_time)
@@ -125,8 +138,9 @@ def greedy_sequential(summary, num_steps, img_path, metric="count soft threshold
         else:
             best_summary = test.collect_data_summary(best_pts[0], best_pts[1])
         best_dist = best_summary[metric + " after push"] - best_summary[metric + " before push"]
-        print(metric + " after push", best_summary[metric + " after push"])
+        print("actual",)
         print(metric + " before push", best_summary[metric + " before push"])
+        print(metric + " after push", best_summary[metric + " after push"])
         print("greedy step %d took"%i, time.time()-cur_time)
         cur_time = time.time()
         if best_dist <= 0:
@@ -154,23 +168,118 @@ def plot(num_samples_lst, means, stds, num_objects,num_trials,num_steps,path):
     plt.savefig(path)
 
 
+def generate_roll_outs(num_trials, num_roll_outs, data_path):
+    for i in range(num_trials):
+        before1 = []
+        after1 = []
+        before2 = []
+        after2 = []
+        before3 = []
+        after3 = []
+        path_i = os.path.join(data_path, "env" + str(i))
+        with open(os.path.join(path_i, "env.json"), "r") as read_file:
+            summary = json.load(read_file)
+        env = SingulationEnv()
+        env.load_env(summary)
+        pt_lst1 = no_prune(env)
+        action1 = random.choice(pt_lst1)
+        best_summary = env.collect_data_summary(action1[0], action1[1])
+        bf = best_summary[metric + " before push"]
+        before1.append(bf)
+        # print("step0", metric + " before push", bf)
+        af = best_summary[metric + " after push"]
+        after1.append(af)
+        # print("step0", metric + " after push", af)
+        pt_lst2 = no_prune(env)
+        action2 = random.choice(pt_lst2)
+        best_summary = env.collect_data_summary(action2[0], action2[1])
+        bf = best_summary[metric + " before push"]
+        before2.append(bf)
+        # print("step1", metric + " before push", bf)
+        af = best_summary[metric + " after push"]
+        after2.append(af)
+        # print("step1", metric + " after push", af)
+        pt_lst3 = no_prune(env)
+        action3 = random.choice(pt_lst3)
+        best_summary = env.collect_data_summary(action3[0], action3[1])
+        bf = best_summary[metric + " before push"]
+        before3.append(bf)
+        # print("step2", metric + " before push", bf)
+        af = best_summary[metric + " after push"]
+        after3.append(af)
+        # print("step2", metric + " after push", af)
+        for i in range(num_roll_outs):
+            env = SingulationEnv()
+            env.load_env(summary)
+            best_summary = env.collect_data_summary(action1[0], action1[1])
+            bf = best_summary[metric + " before push"]
+            before1.append(bf)
+            # print("step0", metric + " before push", bf)
+            af = best_summary[metric + " after push"]
+            after1.append(af)
+            # print("step0", metric + " after push", af)
+            best_summary = env.collect_data_summary(action2[0], action2[1])
+            bf = best_summary[metric + " before push"]
+            before2.append(bf)
+            # print("step1", metric + " before push", bf)
+            af = best_summary[metric + " after push"]
+            after2.append(af)
+            # print("step1", metric + " after push", af)
+            best_summary = env.collect_data_summary(action3[0], action3[1])
+            bf = best_summary[metric + " before push"]
+            before3.append(bf)
+            # print("step2", metric + " before push", bf)
+            af = best_summary[metric + " after push"]
+            after3.append(af)
+            # print("step2", metric + " after push", af)
+        if not after1 == before2:
+            print(i, "not after1 == before2")
+        if not after2 == before3:
+            print(i, "not after2 == before3")
+        print([np.std(x) for x in [before1, after1, before2, after2, before3, after3]])
+
 num_objects = 10
-num_trials = 50
-num_steps = 3
+num_trials = 3
+num_steps = 1
 beg_time = datetime.datetime.now().replace(microsecond=0)
-num_samples = 2400
+num_samples = 1000
+data_path= "/nfs/diskstation/katherineli/sampling_open1"
+metric = "count soft threshold"
+num_roll_outs = 10
+num_trials = 100
+
+returns = run_experiments(num_trials, data_path="/nfs/diskstation/katherineli/sampling_open1", reuse=False,
+                          func=lambda summary, data_path, reuse: sampling_open_loop(summary=summary, data_path=data_path,
+                                                                                        num_samples=num_samples,
+                                                                                        num_steps=num_steps,
+                                                                                        reuse=reuse,
+                                                                                        metric="count soft threshold",
+                                                                                        timeit=True))
+m = np.mean(returns)
+s = np.std(returns)
+print("%d samples, mean: %.2f, std: %.2f"%(num_samples, m, s))
+print("returns", returns)
+time_elapsed = datetime.datetime.now().replace(microsecond=0) - beg_time
+print("Time elapsed:", time_elapsed)
+with open("/nfs/diskstation/katherineli/sampling_open1/2400_samples_time1.pickle", 'wb') as f:
+    pickle.dump(time_elapsed, f)
+with open("/nfs/diskstation/katherineli/sampling_open1/2400_samples_returns1.pickle", 'wb') as f:
+    pickle.dump(returns, f)
+
+
 # returns = run_experiments(num_trials, data_path="/nfs/diskstation/katherineli/greedy", reuse=True,
 #                           func=lambda summary, data_path, reuse: greedy_sequential(summary=summary, num_steps=num_steps,
 #                                                                                         img_path = data_path,
 #                                                                                         metric="count soft threshold"))
 # m = np.mean(returns)
 # s = np.std(returns)
+# print("returns", returns)
 # print("Greedy: mean: %.2f, std: %.2f"%(m, s))
 # print("Time elapsed:", datetime.datetime.now().replace(microsecond=0) - beg_time)
-# with open("/nfs/diskstation/katherineli/greedy/returns.pickle", 'wb') as f:
+# with open("/nfs/diskstation/katherineli/greedy/returns1.pickle", 'wb') as f:
 #     pickle.dump(returns, f)
-
-# returns = run_experiments(num_trials, data_path="/nfs/diskstation/katherineli/sampling", reuse=False,
+#
+# returns = run_experiments(num_trials, data_path="/nfs/diskstation/katherineli/sampling1", reuse=False,
 #                           func=lambda summary, data_path, reuse: sampling_every_step(summary=summary, data_path=data_path,
 #                                                                                         num_samples=num_samples,
 #                                                                                         num_steps=num_steps,
@@ -180,11 +289,12 @@ num_samples = 2400
 # m = np.mean(returns)
 # s = np.std(returns)
 # print("%d samples, mean: %.2f, std: %.2f"%(num_samples, m, s))
+# print("returns", returns)
 # time_elapsed = datetime.datetime.now().replace(microsecond=0) - beg_time
 # print("Time elapsed:", time_elapsed)
-# with open("/nfs/diskstation/katherineli/sampling/2400_samples_time.pickle", 'wb') as f:
+# with open("/nfs/diskstation/katherineli/sampling/2400_samples_time1.pickle", 'wb') as f:
 #     pickle.dump(time_elapsed, f)
-# with open("/nfs/diskstation/katherineli/sampling/2400_samples_returns.pickle", 'wb') as f:
+# with open("/nfs/diskstation/katherineli/sampling/2400_samples_returns1.pickle", 'wb') as f:
 #     pickle.dump(returns, f)
 
 # returns = run_experiments(num_trials, data_path="/nfs/diskstation/katherineli/sampling_greedy", reuse=True,
@@ -200,23 +310,23 @@ num_samples = 2400
 # print("Time elapsed:", datetime.datetime.now().replace(microsecond=0) - beg_time)
 # with open("/nfs/diskstation/katherineli/sampling_greedy/1275_samples.pickle", 'wb') as f:
 #     pickle.dump(returns, f)
-mypath = "/nfs/diskstation/katherineli/sampling_open"
-returns = run_experiments(num_trials, data_path=mypath, reuse=False,
-                          func=lambda summary, data_path, reuse: sampling_open_loop(summary=summary, data_path=data_path,
-                                                                                        num_samples=num_samples,
-                                                                                        num_steps=num_steps,
-                                                                                        reuse=reuse,
-                                                                                        metric="count soft threshold",
-                                                                                        timeit=True))
-m = np.mean(returns)
-s = np.std(returns)
-print("%d samples, mean: %.2f, std: %.2f"%(num_samples, m, s))
-time_elapsed = datetime.datetime.now().replace(microsecond=0) - beg_time
-print("Time elapsed:", time_elapsed)
-with open(os.path.join(mypath, '2400samples_open_loop.pickle'), 'wb') as f:
-    pickle.dump(returns, f)
-with open(os.path.join(mypath, '2400samples_time_open_loop.pickle'), 'wb') as f:
-    pickle.dump(time_elapsed, f)
+# mypath = "/nfs/diskstation/katherineli/sampling_open"
+# returns = run_experiments(num_trials, data_path=mypath, reuse=False,
+#                           func=lambda summary, data_path, reuse: sampling_open_loop(summary=summary, data_path=data_path,
+#                                                                                         num_samples=num_samples,
+#                                                                                         num_steps=num_steps,
+#                                                                                         reuse=reuse,
+#                                                                                         metric="count soft threshold",
+#                                                                                         timeit=True))
+# m = np.mean(returns)
+# s = np.std(returns)
+# print("%d samples, mean: %.2f, std: %.2f"%(num_samples, m, s))
+# time_elapsed = datetime.datetime.now().replace(microsecond=0) - beg_time
+# print("Time elapsed:", time_elapsed)
+# with open(os.path.join(mypath, '2400samples_open_loop.pickle'), 'wb') as f:
+#     pickle.dump(returns, f)
+# with open(os.path.join(mypath, '2400samples_time_open_loop.pickle'), 'wb') as f:
+#     pickle.dump(time_elapsed, f)
 #
 # num_samples_lst = [675, 1250, 1825]
 # returns = []
