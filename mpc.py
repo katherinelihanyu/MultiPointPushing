@@ -243,28 +243,28 @@ num_trials = 3
 num_steps = 1
 beg_time = datetime.datetime.now().replace(microsecond=0)
 num_samples = 1000
-data_path= "/nfs/diskstation/katherineli/sampling_open1"
+data_path= "/nfs/diskstation/katherineli/sampling1"
 metric = "count soft threshold"
 num_roll_outs = 10
 num_trials = 100
 
-returns = run_experiments(num_trials, data_path="/nfs/diskstation/katherineli/sampling_open1", reuse=False,
-                          func=lambda summary, data_path, reuse: sampling_open_loop(summary=summary, data_path=data_path,
-                                                                                        num_samples=num_samples,
-                                                                                        num_steps=num_steps,
-                                                                                        reuse=reuse,
-                                                                                        metric="count soft threshold",
-                                                                                        timeit=True))
-m = np.mean(returns)
-s = np.std(returns)
-print("%d samples, mean: %.2f, std: %.2f"%(num_samples, m, s))
-print("returns", returns)
-time_elapsed = datetime.datetime.now().replace(microsecond=0) - beg_time
-print("Time elapsed:", time_elapsed)
-with open("/nfs/diskstation/katherineli/sampling_open1/2400_samples_time1.pickle", 'wb') as f:
-    pickle.dump(time_elapsed, f)
-with open("/nfs/diskstation/katherineli/sampling_open1/2400_samples_returns1.pickle", 'wb') as f:
-    pickle.dump(returns, f)
+# returns = run_experiments(num_trials, data_path="/nfs/diskstation/katherineli/sampling_open1", reuse=False,
+#                           func=lambda summary, data_path, reuse: sampling_open_loop(summary=summary, data_path=data_path,
+#                                                                                         num_samples=num_samples,
+#                                                                                         num_steps=num_steps,
+#                                                                                         reuse=reuse,
+#                                                                                         metric="count soft threshold",
+#                                                                                         timeit=True))
+# m = np.mean(returns)
+# s = np.std(returns)
+# print("%d samples, mean: %.2f, std: %.2f"%(num_samples, m, s))
+# print("returns", returns)
+# time_elapsed = datetime.datetime.now().replace(microsecond=0) - beg_time
+# print("Time elapsed:", time_elapsed)
+# with open("/nfs/diskstation/katherineli/sampling_open1/2400_samples_time1.pickle", 'wb') as f:
+#     pickle.dump(time_elapsed, f)
+# with open("/nfs/diskstation/katherineli/sampling_open1/2400_samples_returns1.pickle", 'wb') as f:
+#     pickle.dump(returns, f)
 
 
 # returns = run_experiments(num_trials, data_path="/nfs/diskstation/katherineli/greedy", reuse=True,
@@ -279,23 +279,23 @@ with open("/nfs/diskstation/katherineli/sampling_open1/2400_samples_returns1.pic
 # with open("/nfs/diskstation/katherineli/greedy/returns1.pickle", 'wb') as f:
 #     pickle.dump(returns, f)
 #
-# returns = run_experiments(num_trials, data_path="/nfs/diskstation/katherineli/sampling1", reuse=False,
-#                           func=lambda summary, data_path, reuse: sampling_every_step(summary=summary, data_path=data_path,
-#                                                                                         num_samples=num_samples,
-#                                                                                         num_steps=num_steps,
-#                                                                                         reuse=reuse,
-#                                                                                         metric="count soft threshold",
-#                                                                                         timeit=True))
-# m = np.mean(returns)
-# s = np.std(returns)
-# print("%d samples, mean: %.2f, std: %.2f"%(num_samples, m, s))
-# print("returns", returns)
-# time_elapsed = datetime.datetime.now().replace(microsecond=0) - beg_time
-# print("Time elapsed:", time_elapsed)
-# with open("/nfs/diskstation/katherineli/sampling/2400_samples_time1.pickle", 'wb') as f:
-#     pickle.dump(time_elapsed, f)
-# with open("/nfs/diskstation/katherineli/sampling/2400_samples_returns1.pickle", 'wb') as f:
-#     pickle.dump(returns, f)
+returns = run_experiments(num_trials, data_path="/nfs/diskstation/katherineli/sampling1", reuse=False,
+                          func=lambda summary, data_path, reuse: sampling_every_step(summary=summary, data_path=data_path,
+                                                                                        num_samples=num_samples,
+                                                                                        num_steps=num_steps,
+                                                                                        reuse=reuse,
+                                                                                        metric="count soft threshold",
+                                                                                        timeit=True))
+m = np.mean(returns)
+s = np.std(returns)
+print("%d samples, mean: %.2f, std: %.2f"%(num_samples, m, s))
+print("returns", returns)
+time_elapsed = datetime.datetime.now().replace(microsecond=0) - beg_time
+print("Time elapsed:", time_elapsed)
+with open("/nfs/diskstation/katherineli/sampling/2400_samples_time1.pickle", 'wb') as f:
+    pickle.dump(time_elapsed, f)
+with open("/nfs/diskstation/katherineli/sampling/2400_samples_returns1.pickle", 'wb') as f:
+    pickle.dump(returns, f)
 
 # returns = run_experiments(num_trials, data_path="/nfs/diskstation/katherineli/sampling_greedy", reuse=True,
 #                           func=lambda summary, data_path, reuse: sampling_last_step_greedy(summary=summary, data_path=data_path,
@@ -310,23 +310,6 @@ with open("/nfs/diskstation/katherineli/sampling_open1/2400_samples_returns1.pic
 # print("Time elapsed:", datetime.datetime.now().replace(microsecond=0) - beg_time)
 # with open("/nfs/diskstation/katherineli/sampling_greedy/1275_samples.pickle", 'wb') as f:
 #     pickle.dump(returns, f)
-# mypath = "/nfs/diskstation/katherineli/sampling_open"
-# returns = run_experiments(num_trials, data_path=mypath, reuse=False,
-#                           func=lambda summary, data_path, reuse: sampling_open_loop(summary=summary, data_path=data_path,
-#                                                                                         num_samples=num_samples,
-#                                                                                         num_steps=num_steps,
-#                                                                                         reuse=reuse,
-#                                                                                         metric="count soft threshold",
-#                                                                                         timeit=True))
-# m = np.mean(returns)
-# s = np.std(returns)
-# print("%d samples, mean: %.2f, std: %.2f"%(num_samples, m, s))
-# time_elapsed = datetime.datetime.now().replace(microsecond=0) - beg_time
-# print("Time elapsed:", time_elapsed)
-# with open(os.path.join(mypath, '2400samples_open_loop.pickle'), 'wb') as f:
-#     pickle.dump(returns, f)
-# with open(os.path.join(mypath, '2400samples_time_open_loop.pickle'), 'wb') as f:
-#     pickle.dump(time_elapsed, f)
 #
 # num_samples_lst = [675, 1250, 1825]
 # returns = []
