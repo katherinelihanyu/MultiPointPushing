@@ -1260,7 +1260,6 @@ class SingulationEnv:
 		best_sample = None
 		first_step_pt_lst = prune_method(self)
 		complete_pt_lst = list(first_step_pt_lst)
-		# random.shuffle(pt_lst)
 		summary = self.save_env(sum_path=data_path)
 		best_before = None
 		best_after_step0 = None
@@ -1268,7 +1267,7 @@ class SingulationEnv:
 			sample_path = os.path.join(data_path, "sample"+str(i))
 			if not os.path.exists(sample_path):
 				os.makedirs(sample_path)
-			result, action, before, after_step0 = collect_sequential_sample(first_step_pt_lst, complete_pt_lst, summary, reuse, max_step, sample_path, metric, open_loop)
+			result, action, before, after_step0 = collect_sequential_sample(complete_pt_lst, summary, reuse, max_step, sample_path, metric, open_loop)
 			if result > best_result:
 				best_result = result
 				best_action = action
@@ -1423,7 +1422,7 @@ def render_images(data_folder, num_objects):
 	test_env.reset_env_five_objects(next_state)
 	test_env.visualize(os.path.join(data_folder, 'label.png'))
 
-def collect_sequential_sample(first_step_pt_lst, complete_pt_lst, summary, reuse, max_step, sample_path, metric="count soft threshold", open_loop=False):
+def collect_sequential_sample(complete_pt_lst, summary, reuse, max_step, sample_path, metric="count soft threshold", open_loop=False):
 	# first_step_pt_lst are popped, but complete_pt_lst is not
 	actions = []
 	after_step0 = None
@@ -1437,24 +1436,11 @@ def collect_sequential_sample(first_step_pt_lst, complete_pt_lst, summary, reuse
 		else:
 			action = [result["first push start pt"], result["first push end pt"]]
 	else:
-		# step 0
-		action = first_step_pt_lst.pop()
-		actions.append(action)
 		env = SingulationEnv()
 		env.load_env(summary)
-		curr_sum = env.collect_data_summary(action[0], action[1])
-		after_step0 = curr_sum[metric + " after push"]
-		step_path = os.path.join(sample_path, "sample_step0")
-		if not os.path.exists(step_path):
-			os.makedirs(step_path)
-		with open(os.path.join(step_path, "summary.json"), 'w') as f:
-			json.dump(curr_sum, f)
-		# step 1, ..., max_step-1
-		for i in range(1, max_step):
+		for i in range(max_step):
 			best_pts = random.choice(complete_pt_lst)
 			actions.append(best_pts)
-			env = SingulationEnv()
-			env.load_env(summary)
 			curr_sum = env.collect_data_summary(best_pts[0], best_pts[1])
 			step_path = os.path.join(sample_path, "sample_step"+str(i))
 			if not os.path.exists(step_path):
@@ -1464,8 +1450,8 @@ def collect_sequential_sample(first_step_pt_lst, complete_pt_lst, summary, reuse
 		result = {}
 		result[metric + " before push"] = curr_sum[metric + " before push"]
 		result[metric + " after push"] = curr_sum[metric + " after push"]
-		result["first push start pt"] = action[0].tolist()
-		result["first push end pt"] = action[1].tolist()
+		result["first push start pt"] = actions[0][0].tolist()
+		result["first push end pt"] = actions[0][1].tolist()
 		result[metric + " after this step"] = after_step0
 		if len(actions) >1:
 			result["second push start pt"] = actions[1][0].tolist()

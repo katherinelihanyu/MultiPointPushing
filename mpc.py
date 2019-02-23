@@ -240,13 +240,12 @@ def generate_roll_outs(num_trials, num_roll_outs, data_path):
 
 num_objects = 10
 num_trials = 3
-num_steps = 1
+num_steps = 3
 beg_time = datetime.datetime.now().replace(microsecond=0)
-num_samples = 1000
+num_samples = 200
 data_path= "/nfs/diskstation/katherineli/sampling1"
 metric = "count soft threshold"
 num_roll_outs = 10
-num_trials = 100
 
 # returns = run_experiments(num_trials, data_path="/nfs/diskstation/katherineli/sampling_open1", reuse=False,
 #                           func=lambda summary, data_path, reuse: sampling_open_loop(summary=summary, data_path=data_path,
