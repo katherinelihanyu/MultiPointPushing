@@ -36,7 +36,7 @@ def sampling_every_step(summary, data_path, num_samples, num_steps, reuse, reuse
                                                     img_path=os.path.join(reuse_step_path, "render"), display=False,
                                                     sum_path=reuse_step_path)
         else:
-            best_summary = env.collect_data_summary(best_pts[0], best_pts[1], img_path=os.path.join(actual_step_path, "render"), display=True, sum_path=actual_step_path)
+            best_summary = env.collect_data_summary(best_pts[0], best_pts[1], img_path=os.path.join(actual_step_path, "render"), display=False, sum_path=actual_step_path)
         print("actual")
         print(metric + " before push", best_summary[metric + " before push"])
         print(metric + " after push", best_summary[metric + " after push"])
