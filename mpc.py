@@ -49,8 +49,9 @@ def sampling_open_loop(summary, data_path, num_samples, num_steps, reuse, metric
     actual_step_path = os.path.join(data_path, "samples")
     if not os.path.exists(actual_step_path):
         os.makedirs(actual_step_path)
-    best_result, actions = env.best_sequential_sample(num_samples, no_prune, reuse=reuse, max_step=num_steps,
+    best_result, actions, info = env.best_sequential_sample(num_samples, no_prune, reuse=reuse, max_step=num_steps,
                                                    data_path=actual_step_path, metric=metric, open_loop=True)
+
     for i in range(len(actions)):
         best_pts = actions[i]
         print("step", i)
@@ -58,8 +59,12 @@ def sampling_open_loop(summary, data_path, num_samples, num_steps, reuse, metric
         if not os.path.exists(actual_step_path):
             os.makedirs(actual_step_path)
         best_summary = env.collect_data_summary(best_pts[0], best_pts[1], img_path=actual_step_path, display=False, sum_path=actual_step_path)
-        print(metric + " before push", best_summary[metric + " before push"], "projected reward at step %d: %.2f" % (i + 3, best_result))
-        print(metric + " after push", best_summary[metric + " after push"])
+        print("predicted action", info[i*3])
+        print("actual action", best_pts)
+        print("predicted", metric, "before push", info[i*3+1])
+        print("actual", metric, "before push", best_summary[metric + " before push"])
+        print("predicted", metric, "after push", info[3*i+2])
+        print("actual", metric, "after push", best_summary[metric + " after push"])
         if timeit:
             print("sampling step %d took"%i, datetime.datetime.now().replace(microsecond=0) - cur_time)
             cur_time = datetime.datetime.now().replace(microsecond=0)
@@ -155,10 +160,10 @@ def plot(num_samples_lst, means, stds, num_objects,num_trials,num_steps,path):
 
 
 num_objects = 10
-num_trials = 50
+num_trials = 5
 num_steps = 3
 beg_time = datetime.datetime.now().replace(microsecond=0)
-num_samples = 2400
+num_samples = 200
 # returns = run_experiments(num_trials, data_path="/nfs/diskstation/katherineli/greedy", reuse=True,
 #                           func=lambda summary, data_path, reuse: greedy_sequential(summary=summary, num_steps=num_steps,
 #                                                                                         img_path = data_path,
@@ -200,7 +205,7 @@ num_samples = 2400
 # print("Time elapsed:", datetime.datetime.now().replace(microsecond=0) - beg_time)
 # with open("/nfs/diskstation/katherineli/sampling_greedy/1275_samples.pickle", 'wb') as f:
 #     pickle.dump(returns, f)
-mypath = "/nfs/diskstation/katherineli/sampling_open"
+mypath = "/nfs/diskstation/katherineli/sampling_open1"
 returns = run_experiments(num_trials, data_path=mypath, reuse=False,
                           func=lambda summary, data_path, reuse: sampling_open_loop(summary=summary, data_path=data_path,
                                                                                         num_samples=num_samples,
