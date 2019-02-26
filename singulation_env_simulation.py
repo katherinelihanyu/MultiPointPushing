@@ -1045,7 +1045,12 @@ class SingulationEnv:
 		
 		return summary
 
-	def collect_data_summary(self, start_pt, end_pt, img_path=None, display=False, sum_path=None):
+	def collect_data_summary(self, start_pt, end_pt, golden_summary=None, first_step=False, img_path=None, display=False, sum_path=None):
+		# if first_step:
+		# 	actual_summary = self.save_env()
+		# 	predicate = golden_summary == actual_summary
+		# 	if not predicate:
+		# 		print("golden_summary != actual_summary")
 		summary = {}
 		abs_start_pt = np.array(start_pt)
 		abs_end_pt = np.array(end_pt)
@@ -1176,9 +1181,10 @@ class SingulationEnv:
 
 		return 1
 
-	def save_env(self, sum_path=None):
+	def save_env(self,sum_path=None):
 		summary = {}
 		summary["num_objects"] = len(self.objs)
+		# summary["count soft threshold"] = self.count_soft_threshold()
 
 		for i in range(len(self.objs)):
 			summary[str(i) + " original pos"] = np.array(self.objs[i].body.position).tolist()
@@ -1255,14 +1261,19 @@ class SingulationEnv:
 		best_action = None
 		best_sample = None
 		best_info = None
+		import pdb;
+		pdb.set_trace()
+		summary = self.save_env(sum_path=data_path)
 		first_step_pt_lst = prune_method(self)
 		complete_pt_lst = list(first_step_pt_lst)
-		summary = self.save_env(sum_path=data_path)
 		for i in range(num_samples):
 			sample_path = os.path.join(data_path, "sample"+str(i))
 			if not os.path.exists(sample_path):
 				os.makedirs(sample_path)
+			before = self.save_env()
 			result, action, info = collect_sequential_sample(complete_pt_lst, summary, reuse, max_step, sample_path, metric, open_loop)
+			if before != self.save_env():
+				print("before != self.save_env()")
 			if result > best_result:
 				best_result = result
 				best_action = action
@@ -1421,25 +1432,40 @@ def collect_sequential_sample(complete_pt_lst, summary, reuse, max_step, sample_
 			actions.append([result["second push start pt"], result["second push end pt"]])
 			actions.append([result["third push start pt"], result["third push end pt"]])
 		else:
-			action = [result["first push start pt"], result["first push end pt"]]
+			actions.append([result["first push start pt"], result["first push end pt"]])
 	else:
 		info = []
+		result = {}
 		env = SingulationEnv()
 		env.load_env(summary)
+		curr = env.save_env()
+		info.append(curr)
+		count_before = env.count_soft_threshold()
+		# if summary != curr:
+		# 	print("summary", json.dumps(summary))
+		# 	print()
+		# 	print("curr", json.dumps(curr))
+		# 	print()
 		for i in range(max_step):
 			best_pts = random.choice(complete_pt_lst)
-			info.append(best_pts)
 			actions.append(best_pts)
-			curr_sum = env.collect_data_summary(best_pts[0], best_pts[1])
-			info.append(curr_sum[metric + " before push"])
-			info.append(curr_sum[metric + " after push"])
+			curr_sum = env.collect_data_summary(best_pts[0], best_pts[1], summary, first_step = i==0 and max_step < 3)
+			count_after = env.count_soft_threshold()
+			if i == 0:
+				info.append(env.save_env())
+				info.append(curr_sum[metric + " before push"])
+				result[metric + " before push"] = curr_sum[metric + " before push"]
+				if count_before != curr_sum[metric + " before push"]:
+					print("!!! count before not equal", count_before, curr_sum[metric + " before push"])
+				info.append(curr_sum[metric + " after push"])
+				if count_after != curr_sum[metric + " after push"]:
+					print("count after not equal", count_after, curr_sum[metric + " after push"])
+				info.append(best_pts)
 			step_path = os.path.join(sample_path, "sample_step"+str(i))
 			if not os.path.exists(step_path):
 				os.makedirs(step_path)
 			with open(os.path.join(step_path, "summary.json"), 'w') as f:
 				json.dump(curr_sum, f)
-		result = {}
-		result[metric + " before push"] = curr_sum[metric + " before push"]
 		result[metric +" after push"] = curr_sum[metric +" after push"]
 		result["first push start pt"] = actions[0][0].tolist()
 		result["first push end pt"] = actions[0][1].tolist()
@@ -1454,7 +1480,7 @@ def collect_sequential_sample(complete_pt_lst, summary, reuse, max_step, sample_
 	if open_loop:
 		return result[metric +" after push"], actions, info
 	else:
-		return result[metric + " after push"], action
+		return result[metric + " after push"], actions[0], info
 
 def create_initial_envs(num_trials, num_objects, data_path):
 	for i in range(num_trials):
