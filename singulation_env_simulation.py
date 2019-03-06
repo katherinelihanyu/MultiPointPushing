@@ -877,21 +877,20 @@ class SingulationEnv:
 		count = 0.0
 		for i in range(len(self.objs)):
 			min_dist = 1e2
-			for j in range(len(self.objs)):
-				if i != j:
-					shape1 = self.objs[i].fixtures[0].shape
-					shape2 = self.objs[j].fixtures[0].shape
-					transform1 = Box2D.b2Transform()
-					pos1 = self.objs[i].body.position
-					angle1 = self.objs[i].body.angle
-					transform1.Set(pos1, angle1)
-					transform2 = Box2D.b2Transform()
-					pos2 = self.objs[j].body.position
-					angle2 = self.objs[j].body.angle
-					transform2.Set(pos2, angle2)
-					pointA, pointB, distance, iterations = Box2D.b2Distance(shapeA=shape1, shapeB=shape2, transformA=transform1, transformB=transform2)
-					if distance < min_dist:
-						min_dist = distance
+			for j in range(i+1, len(self.objs)):
+				shape1 = self.objs[i].fixtures[0].shape
+				shape2 = self.objs[j].fixtures[0].shape
+				transform1 = Box2D.b2Transform()
+				pos1 = self.objs[i].body.position
+				angle1 = self.objs[i].body.angle
+				transform1.Set(pos1, angle1)
+				transform2 = Box2D.b2Transform()
+				pos2 = self.objs[j].body.position
+				angle2 = self.objs[j].body.angle
+				transform2.Set(pos2, angle2)
+				pointA, pointB, distance, iterations = Box2D.b2Distance(shapeA=shape1, shapeB=shape2, transformA=transform1, transformB=transform2)
+				if distance < min_dist:
+					min_dist = distance
 			count += (sigmoid(min_dist*10) - 0.5) * 2
 		return count
 
@@ -1184,10 +1183,11 @@ class SingulationEnv:
 	def save_env(self,sum_path=None):
 		summary = {}
 		summary["num_objects"] = len(self.objs)
-		# summary["count soft threshold"] = self.count_soft_threshold()
+		summary["count soft threshold"] = self.count_soft_threshold()
 
 		for i in range(len(self.objs)):
 			summary[str(i) + " original pos"] = np.array(self.objs[i].body.position).tolist()
+			summary[str(i) + " angle"] = self.objs[i].body.angle
 			summary[str(i) + " vertices"] = np.array(self.objs[i].vertices).tolist()
 		if sum_path != None:
 			with open(os.path.join(sum_path, 'env.json'), 'w') as f:
@@ -1198,7 +1198,7 @@ class SingulationEnv:
 		for i in range(dic["num_objects"]):
 			original_pos = np.array(dic[str(i)+" original pos"])
 			vertices = np.array(dic[str(i)+" vertices"])
-			body = self.world.CreateDynamicBody(position=original_pos.tolist(), allowSleep=False)
+			body = self.world.CreateDynamicBody(position=original_pos.tolist(), angle=dic.get(str(i)+" angle", 0.0), allowSleep=False)
 			fixture = body.CreatePolygonFixture(density=1, vertices=vertices.tolist(), friction=0.5)
 			self.objs.append(Polygon(body, [fixture], vertices, Colors[i%len(Colors)]))
 
@@ -1261,9 +1261,8 @@ class SingulationEnv:
 		best_action = None
 		best_sample = None
 		best_info = None
-		import pdb;
-		pdb.set_trace()
-		summary = self.save_env(sum_path=data_path)
+# 		import pdb; pdb.set_trace()
+		summary = self.save_env()
 		first_step_pt_lst = prune_method(self)
 		complete_pt_lst = list(first_step_pt_lst)
 		for i in range(num_samples):
@@ -1271,7 +1270,7 @@ class SingulationEnv:
 			if not os.path.exists(sample_path):
 				os.makedirs(sample_path)
 			before = self.save_env()
-			result, action, info = collect_sequential_sample(complete_pt_lst, summary, reuse, max_step, sample_path, metric, open_loop)
+			result, action, info = collect_sequential_sample(complete_pt_lst, summary, self, reuse, max_step, sample_path, metric, open_loop)
 			if before != self.save_env():
 				print("before != self.save_env()")
 			if result > best_result:
@@ -1421,7 +1420,7 @@ def render_images(data_folder, num_objects):
 	test_env.reset_env_five_objects(next_state)
 	test_env.visualize(os.path.join(data_folder, 'label.png'))
 
-def collect_sequential_sample(complete_pt_lst, summary, reuse, max_step, sample_path, metric="count soft threshold", open_loop=False):
+def collect_sequential_sample(complete_pt_lst, summary, model, reuse, max_step, sample_path, metric="count soft threshold", open_loop=False):
 	# first_step_pt_lst are popped, but complete_pt_lst is not
 	actions = []
 	if reuse:
@@ -1439,6 +1438,7 @@ def collect_sequential_sample(complete_pt_lst, summary, reuse, max_step, sample_
 		env = SingulationEnv()
 		env.load_env(summary)
 		curr = env.save_env()
+		assert compare_soft_threshold(model, env)
 		info.append(curr)
 		count_before = env.count_soft_threshold()
 		# if summary != curr:
@@ -1482,6 +1482,25 @@ def collect_sequential_sample(complete_pt_lst, summary, reuse, max_step, sample_
 	else:
 		return result[metric + " after push"], actions[0], info
 
+def compare_soft_threshold(env1, env2):
+	if len(env1.objs) != len(env2.objs):
+		print("length of objects not the same")
+		return False
+	for i in range(len(env1.objs)):
+		if env1.objs[i].fixtures[0].shape.vertices != env2.objs[i].fixtures[0].shape.vertices:
+			print("env1.objs[%d].fixtures[0].shape.vertices"%i, env1.objs[i].fixtures[0].shape.vertices)
+			print("env2.objs[%d].fixtures[0].shape.vertices"%i, env2.objs[i].fixtures[0].shape.vertices)
+			return False
+		if env1.objs[i].body.position != env2.objs[i].body.position:
+			print("env1.objs[%d].body.position"%i, env1.objs[i].body.position)
+			print("env2.objs[%d].body.position"%i, env2.objs[i].body.position)
+			return False
+		if env1.objs[i].body.angle != env2.objs[i].body.angle:
+			print("env1.objs[%d].body.angle"%i, env1.objs[i].body.angle)
+			print("env2.objs[%d].body.angle"%i, env2.objs[i].body.angle)
+			return False
+	return True
+
 def create_initial_envs(num_trials, num_objects, data_path):
 	for i in range(num_trials):
 		path = os.path.join(data_path, "env" + str(i))
@@ -1494,3 +1513,17 @@ def create_initial_envs(num_trials, num_objects, data_path):
 if __name__ == "__main__":
 	data_path = "/nfs/diskstation/katherineli/sampling"
 	create_initial_envs(50,10,data_path)
+# 	path = "/nfs/diskstation/katherineli/sampling1/env0/env.json"
+# 	with open(path, "r") as read_file:
+# 		s0 = json.load(read_file)
+# 	env1 = SingulationEnv()
+# 	env1.load_env(s0)
+# 	print(env1.count_soft_threshold())
+# 	s1 = env1.save_env()
+# 	print(env1.count_soft_threshold())
+# 	env2 = SingulationEnv()
+# 	env2.load_env(s0)
+# 	print(env2.count_soft_threshold())
+# 	env3 = SingulationEnv()
+# 	env3.load_env(s1)
+# 	print(env3.count_soft_threshold())

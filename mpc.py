@@ -177,10 +177,10 @@ def plot(num_samples_lst, means, stds, num_objects,num_trials,num_steps,path):
     plt.savefig(path)
 
 num_objects = 10
-num_trials = 15
+num_trials = 30
 num_steps = 3
 beg_time = datetime.datetime.now().replace(microsecond=0)
-num_samples = 200
+num_samples = 30
 mypath = "/nfs/diskstation/katherineli/sampling1"
 returns = run_experiments(num_trials, data_path=mypath, reuse=False,
                           func=lambda summary, data_path, reuse: sampling_every_step(summary=summary, data_path=data_path,
