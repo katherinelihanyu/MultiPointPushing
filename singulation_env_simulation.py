@@ -1289,10 +1289,10 @@ class SingulationEnv:
 	def prune_best(self, prune_method, metric="count threshold", position=None):
 		pt_lst = prune_method(self)
 		best_pt = None
-		# if metric == "avg centroid" or metric == "avg geometry":
 		best_sep = -1e2
 		print("len(pt_lst)", len(pt_lst))
-		for pts in pt_lst:
+		info = {}
+		for pts in pt_lst[:1000]:
 			if position is None:
 				self.reset()
 			else:
@@ -1301,13 +1301,14 @@ class SingulationEnv:
 			if summary[metric +" after push"] - summary[metric + " before push"] >= best_sep:
 				best_pt = pts
 				best_sep = summary[metric +" after push"] - summary[metric + " before push"]
-
+				info[metric + " before push"] = summary[metric + " before push"]
+				info[metric + " after push"] = summary[metric + " after push"]
+				info["env after push"] = self.save_env()
 		if position is None:
 			self.reset()
 		else:
 			self.load_position(position)
-		# 	return self.collect_data_summary(best_pt[0], best_pt[1], "/", sum_path=sum_path)
-		return best_pt
+		return best_pt, info
 
 	def select_random(self, prune_method):
 		pt_lst = prune_method(self)
@@ -1421,7 +1422,6 @@ def render_images(data_folder, num_objects):
 	test_env.visualize(os.path.join(data_folder, 'label.png'))
 
 def collect_sequential_sample(complete_pt_lst, summary, model, reuse, max_step, sample_path, metric="count soft threshold", open_loop=False):
-	# first_step_pt_lst are popped, but complete_pt_lst is not
 	actions = []
 	if reuse:
 		with open(os.path.join(sample_path, "push_summary.json"), "r") as read_file:
@@ -1433,34 +1433,30 @@ def collect_sequential_sample(complete_pt_lst, summary, model, reuse, max_step, 
 		else:
 			actions.append([result["first push start pt"], result["first push end pt"]])
 	else:
-		info = []
+		info = {}
 		result = {}
 		env = SingulationEnv()
 		env.load_env(summary)
 		curr = env.save_env()
 		assert compare_soft_threshold(model, env)
-		info.append(curr)
 		count_before = env.count_soft_threshold()
-		# if summary != curr:
-		# 	print("summary", json.dumps(summary))
-		# 	print()
-		# 	print("curr", json.dumps(curr))
-		# 	print()
+		info["env before push"] = env.save_env()
 		for i in range(max_step):
 			best_pts = random.choice(complete_pt_lst)
 			actions.append(best_pts)
 			curr_sum = env.collect_data_summary(best_pts[0], best_pts[1], summary, first_step = i==0 and max_step < 3)
 			count_after = env.count_soft_threshold()
 			if i == 0:
-				info.append(env.save_env())
-				info.append(curr_sum[metric + " before push"])
+				info["action"] = best_pts
+				info[metric + " before push"] = curr_sum[metric + " before push"]
 				result[metric + " before push"] = curr_sum[metric + " before push"]
 				if count_before != curr_sum[metric + " before push"]:
 					print("!!! count before not equal", count_before, curr_sum[metric + " before push"])
-				info.append(curr_sum[metric + " after push"])
+				info[metric + " after push"] = curr_sum[metric + " after push"]
+				info["env after push"] = env.save_env()
 				if count_after != curr_sum[metric + " after push"]:
 					print("count after not equal", count_after, curr_sum[metric + " after push"])
-				info.append(best_pts)
+				info["best_pts"] = best_pts
 			step_path = os.path.join(sample_path, "sample_step"+str(i))
 			if not os.path.exists(step_path):
 				os.makedirs(step_path)
@@ -1513,17 +1509,3 @@ def create_initial_envs(num_trials, num_objects, data_path):
 if __name__ == "__main__":
 	data_path = "/nfs/diskstation/katherineli/sampling"
 	create_initial_envs(50,10,data_path)
-# 	path = "/nfs/diskstation/katherineli/sampling1/env0/env.json"
-# 	with open(path, "r") as read_file:
-# 		s0 = json.load(read_file)
-# 	env1 = SingulationEnv()
-# 	env1.load_env(s0)
-# 	print(env1.count_soft_threshold())
-# 	s1 = env1.save_env()
-# 	print(env1.count_soft_threshold())
-# 	env2 = SingulationEnv()
-# 	env2.load_env(s0)
-# 	print(env2.count_soft_threshold())
-# 	env3 = SingulationEnv()
-# 	env3.load_env(s1)
-# 	print(env3.count_soft_threshold())
