@@ -1309,7 +1309,7 @@ class SingulationEnv:
 		print("predicted")
 		print(metric + " before push", best_before)
 		print(metric + " after push", best_after)
-		return best_pt
+		return best_pt, best_before, best_after
 
 	def select_random(self, prune_method):
 		pt_lst = prune_method(self)
