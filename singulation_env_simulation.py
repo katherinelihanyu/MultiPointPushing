@@ -140,10 +140,8 @@ class SingulationEnv:
             # create shape
             vertices = generatePolygon(GROUPS[group][0], GROUPS[group][1], GROUPS[group][2])
             raw_com = np.array(compute_centroid(vertices))
-            print("raw_com", raw_com)
             vertices = (vertices - raw_com)
             bounding_r = math.sqrt(max(vertices[:, 0]**2 + vertices[:, 1]**2))
-            print("bounding_r", bounding_r)
             vertices = vertices / bounding_r
             # place object
             if len(self.objs) == 0:
@@ -280,47 +278,6 @@ class SingulationEnv:
             pygame.display.quit()
             pygame.quit()
             imageio.mimsave(os.path.join(path, 'push.gif'), images)
-        return first_contact
-
-    def step_area(self, start_pt, end_pt, gripper_width, path, display=False, check_reachable=True):
-        start_pt = np.array(start_pt)
-        end_pt = np.array(end_pt)
-        vertices_lst=[(0.1, gripper_width/2), (-0.1, gripper_width/2), (-0.1, -gripper_width/2), (0.1, -gripper_width/2)]
-        vector = np.array(normalize(end_pt - start_pt))
-        self.rod = self.world.CreateKinematicBody(position=(start_pt[0], start_pt[1]), allowSleep=False)
-        self.rodfix = self.rod.CreatePolygonFixture(vertices=[rotatePt(pt, vector) for pt in vertices_lst])
-        # reachability check
-        if check_reachable:
-            while (np.count_nonzero(np.array([o.dist_rod(self.rodfix, self.rod) for o in self.objs]) <= 0) > 0):
-                start_pt -= 0.1 * vector
-                self.rod.DestroyFixture(self.rodfix)
-                self.world.DestroyBody(self.rod)
-                self.rod = self.world.CreateKinematicBody(position=(start_pt[0], start_pt[1]), allowSleep=False)
-                self.rodfix = self.rod.CreatePolygonFixture(vertices=[rotatePt(pt, vector) for pt in vertices_lst])
-        self.rod.linearVelocity[0] = vector[0]
-        self.rod.linearVelocity[1] = vector[1]
-        self.rod.angularVelocity = 0.0
-        timestamp = 0
-        first_contact = -1
-        while (timestamp < 100):
-            if first_contact == -1:
-                for i in range(len(self.objs)):
-                    if (self.objs[i].body.linearVelocity[0] ** 2 + self.objs[i].body.linearVelocity[1] ** 2 > 0.001):
-                        first_contact = i
-            for obj in self.objs:
-                obj.body.linearVelocity[0] *= DAMPING_FACTOR
-                obj.body.linearVelocity[1] *= DAMPING_FACTOR
-                obj.body.angularVelocity *= DAMPING_FACTOR
-            if (math.sqrt(np.sum((start_pt - np.array(self.rod.position))**2)) < 4):
-                vector = normalize((end_pt+1e-8) - (start_pt+1e-8))
-                self.rod.linearVelocity[0] = vector[0]
-                self.rod.linearVelocity[1] = vector[1]
-            else:
-                self.rod.linearVelocity[0] = 0
-                self.rod.linearVelocity[1] = 0
-                break
-            self.world.Step(TIME_STEP, 8, 3)
-            timestamp += 1
         return first_contact
 
     def count_threshold(self, threshold=0.3):
@@ -547,11 +504,10 @@ class SingulationEnv:
             obj.body.linearVelocity[1] = 0.0
             obj.body.angularVelocity = 0.0
 
-# if __name__ == "__main__":
-    # data_path = "/nfs/diskstation/katherineli/sampling"
-    # create_initial_envs(50,10,data_path)
-    # env = SingulationEnv()
-    # env.create_random_env_wrapper()
-    # env.visualize("./norm2.png")
-    # pts = no_prune(env)[10]
-    # env.step(pts[0],pts[1],".",display=True)
+if __name__ == "__main__":
+    num_env = 5
+    for i in range(num_env):
+        env = SingulationEnv()
+        env.create_random_env(num_objs=5)
+        env.visualize("./orig_%d.png"%i)
+        print("orig_env%d:"%i, env.count_soft_threshold())
