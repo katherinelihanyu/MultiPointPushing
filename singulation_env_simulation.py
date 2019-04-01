@@ -64,7 +64,7 @@ class Polygon:
         self.vertices = vertices
         self.color = color
         self.original_pos = np.array(self.body.position)
-        # self.bounding_circle_radius = math.sqrt(max(self.vertices[:, 0]**2 + self.vertices[:, 1]**2))
+        self.bounding_circle_radius = math.sqrt(max(self.vertices[:, 0]**2 + self.vertices[:, 1]**2))
 
     def test_overlap(self, other_polygon):
         if self.dist(other_polygon) > 0:
@@ -505,9 +505,11 @@ class SingulationEnv:
             obj.body.angularVelocity = 0.0
 
 if __name__ == "__main__":
-    num_env = 5
+    num_env = 3
     for i in range(num_env):
         env = SingulationEnv()
-        env.create_random_env(num_objs=5)
-        env.visualize("./orig_%d.png"%i)
-        print("orig_env%d:"%i, env.count_soft_threshold())
+        env.create_random_env_wrapper(num_objs=5)
+        print("before%d:"%i, env.count_soft_threshold())
+        push = random.choice(no_prune(env))
+        env.step(push[0],push[1], "./no_reach/push%d"%i, display=True, check_reachable=False)
+        print("after%d:"%i, env.count_soft_threshold())
