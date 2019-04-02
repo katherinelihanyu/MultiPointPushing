@@ -26,7 +26,7 @@ DAMPING_FACTOR = 1 - ((1 - 0.5) / 3)
 
 
 class Polygon:
-    def __init__(self, position=None, vertices=None, shape=0, color=None):
+    def __init__(self, position=None, vertices=None, shape=0, color=None, rod=False):
         if vertices is None:
             self.vertices = np.array(polygon(*POLYGON_SHAPES[shape]))
         else:
@@ -39,10 +39,17 @@ class Polygon:
             self.color = random.choice(COLORS)
         else:
             self.color = color
-        self.body = WORLD.CreateDynamicBody(position=self.position.tolist(), allowSleep=False)
+        if rod:
+            self.body = WORLD.CreateKinematicBody(position=self.position, allowSleep=False)
+        else:
+            self.body = WORLD.CreateDynamicBody(position=self.position.tolist(), allowSleep=False)
         self.fixture = self.body.CreatePolygonFixture(density=1, vertices=self.vertices.tolist(), friction=FRICTION)
         self.bounding_circle_radius = math.sqrt(max(self.vertices[:, 0]**2 + self.vertices[:, 1]**2))
     
+    def destroy(self):
+        self.body.DestroyFixture(self.fixture)
+        WORLD.DestroyBody(self.body)
+
     def distance(self, other_polygon):
         transform1 = b2Transform()
         transform1.Set(self.body.position, self.body.angle)
@@ -66,8 +73,53 @@ class State:
         vertices = [(v[0], SCREEN_HEIGHT - v[1]) for v in vertices]
         pygame.draw.polygon(self.screen, color, vertices)  # inside rectangle
         pygame.draw.polygon(self.screen, BLACK, vertices, 5)  # boundary of rectangle
-        
-    def apply_push(self, start_pt, end_pt, path, display=False, check_reachable=True):
+
+    def clear(self):
+        """Remove all objects."""
+        for obj in self.objects:
+            obj.destroy()
+        self.objects = []
+
+    def count_soft_threshold(self):
+        count = 0.0
+        for i in range(len(self.objects)):
+            min_dist = 1e2
+            for j in range(i+1, len(self.objects)):
+                dist = self.objects[i].distance(self.objects[j])
+                if dist < min_dist:
+                    min_dist = dist
+            count += (sigmoid(min_dist*10)-0.5)*2  # assume threshold=0.3. Want f(0)=0, f(0.3)=1
+        return count
+
+    def create_random_env(self, num_objs=3, shape=0, max_iter_limit=10000):
+        self.clear()
+        while len(self.objects) < num_objs:
+            self.clear()
+            self.objects.append(Polygon(shape=shape, color=COLORS[0]))
+            for i in range(1, num_objs):
+                for _ in range(max_iter_limit):
+                    original_pos = adjacent_location(self.objects[-1].body.position) # place object close to the last object
+                    obj = Polygon(position=original_pos, shape=shape, color=COLORS[i % len(COLORS)])
+                    overlapped = False
+                    for other_obj in self.objects:
+                        if other_obj.overlap(obj):
+                            overlapped = True
+                            break 
+                    if overlapped:
+                        obj.body.DestroyFixture(obj.fixture)
+                        WORLD.DestroyBody(obj.body)
+                    else:
+                        self.objects.append(obj)
+                        break
+                if len(self.objects) <= i:
+                    break
+
+    def load(self, summary):
+        """Load environment defined by summary (an output from save)"""
+        for i, obj in enumerate(self.objects):
+           obj.body.position[0], obj.body.position[1], obj.body.angle, obj.body.linearVelocity[0], obj.body.linearVelocity[1], obj.body.angularVelocity = summary[i]
+
+    def push(self, start_pt, end_pt, path=None, display=False, check_reachable=True):
         if display:
             images = []
             if not os.path.exists(path):
@@ -83,16 +135,12 @@ class State:
         # reachability check
         if check_reachable:
             vertices_lst = [(0.0, 0.1), (0.0, -0.1), (-0.3, -0.1), (-0.3, 0.1)]
-            testrod = WORLD.CreateKinematicBody(position=(start_pt[0], start_pt[1]), allowSleep=False)
-            testrodfix = testrod.CreatePolygonFixture(vertices=[rotatePt(pt, vector) for pt in vertices_lst])
-            while (np.count_nonzero(np.array([o.dist_rod(testrodfix, testrod) for o in self.objects]) <= 0) > 0):
+            test_rod = Polygon(position=(start_pt[0], start_pt[1]), vertices=[rotatePt(pt, vector) for pt in vertices_lst], rod=True)
+            while (np.count_nonzero(np.array([obj.distance(test_rod) for obj in self.objects]) <= 0) > 0):
                 start_pt -= 0.1 * vector
-                testrod.DestroyFixture(testrodfix)
-                WORLD.DestroyBody(testrod)
-                testrod = WORLD.CreateKinematicBody(position=(start_pt[0], start_pt[1]), allowSleep=False)
-                testrodfix = testrod.CreatePolygonFixture(vertices=[rotatePt(pt, vector) for pt in vertices_lst])
-            testrod.DestroyFixture(testrodfix)
-            WORLD.DestroyBody(testrod)
+                test_rod.destroy()
+                test_rod = Polygon(position=(start_pt[0], start_pt[1]), vertices=[rotatePt(pt, vector) for pt in vertices_lst], rod=True)
+            test_rod.destroy()
         self.rod.linearVelocity[0] = vector[0]
         self.rod.linearVelocity[1] = vector[1]
         self.rod.angularVelocity = 0.0
@@ -143,46 +191,23 @@ class State:
             imageio.mimsave(os.path.join(path, 'push.gif'), images)
         return first_contact
 
-    def clear(self):
-        """Remove all objects."""
-        for obj in self.objects:
-            obj.body.DestroyFixture(obj.fixture)
-            WORLD.DestroyBody(obj.body)
-        self.objects = []
+    def sample(self, num_steps, prune_method, metric, display=False, path=None):
+        """Collect a sample of length num_steps"""
+        actions = np.zeros((num_steps,4))
+        for i in range(num_steps):
+            vec = random.choice(prune_method(self))
+            actions[i] = np.hstack((vec[0],vec[1])).flatten()
+            self.push(vec[0], vec[1], display=display, path=os.path.join(path, str(i)))
+        actions_tuple = tuple(actions.flatten())
+        final_score = metric()
+        print("after", self.count_soft_threshold())
+        assert final_score == self.count_soft_threshold()
+        return final_score, actions_tuple
 
-    def count_soft_threshold(self):
-        count = 0.0
-        for i in range(len(self.objects)):
-            min_dist = 1e2
-            for j in range(i+1, len(self.objects)):
-                dist = self.objects[i].distance(self.objects[j])
-                if dist < min_dist:
-                    min_dist = dist
-            count += (sigmoid(min_dist*10)-0.5)*2  # assume threshold=0.3. Want f(0)=0, f(0.3)=1
-        return count
-
-    def create_random_env(self, num_objs=3, shape=0, max_iter_limit=10000):
-        self.clear()
-        while len(self.objects) < num_objs:
-            self.clear()
-            self.objects.append(Polygon(shape=shape, color=COLORS[0]))
-            for i in range(1, num_objs):
-                for _ in range(max_iter_limit):
-                    original_pos = adjacent_location(self.objects[-1].body.position) # place object close to the last object
-                    obj = Polygon(position=original_pos, shape=shape, color=COLORS[i % len(COLORS)])
-                    overlapped = False
-                    for other_obj in self.objects:
-                        if other_obj.overlap(obj):
-                            overlapped = True
-                            break 
-                    if overlapped:
-                        obj.body.DestroyFixture(obj.fixture)
-                        WORLD.DestroyBody(obj.body)
-                    else:
-                        self.objects.append(obj)
-                        break
-                if len(self.objects) <= i:
-                    break
+    def save(self):
+        """Save information about current state in a dictionary in sum_path/env.json"""
+        summary = np.array([[obj.body.position[0], obj.body.position[1], obj.body.angle, obj.body.linearVelocity[0], obj.body.linearVelocity[1], obj.body.angularVelocity] for obj in self.objects])
+        return summary
 
     def visualize(self, path):
         """Capture an image of the current state.
@@ -201,15 +226,9 @@ class State:
 if __name__ == "__main__":
     env = State()
     env.create_random_env(num_objs=5)
-    print("before")
-    print("count_soft_threshold:", env.count_soft_threshold())
-    for i in range(len(env.objects)):
-        print("position%d:"%i, env.objects[i].body.position)
-        print("angle%d:"%i, env.objects[i].body.angle)
-    push = random.choice(no_prune(env))
-    env.apply_push(push[0],push[1], "./push", display=True, check_reachable=False)
-    print("after")
-    print("count_soft_threshold:", env.count_soft_threshold())
-    for i in range(len(env.objects)):
-        print("position%d:"%i, env.objects[i].body.position)
-        print("angle%d:"%i, env.objects[i].body.angle)
+    print("before count", env.count_soft_threshold())
+    final_score, actions_tuple = env.sample(num_steps=3, prune_method=no_prune, metric=env.count_soft_threshold, display=True, path="./push")
+    print("after count", final_score)
+    print(actions_tuple)
+    
+
