@@ -1,3 +1,5 @@
+import imageio
+import os
 import pygame
 import random
 import matplotlib.pyplot as plt
@@ -15,18 +17,20 @@ color_list = plt.cm.get_cmap('Accent')(np.linspace(0, 1, num_classes))
 COLORS = [(int(255*c[0]), int(255*c[1]), int(255*c[2]), int(255*c[3])) for c in color_list]
 
 """Physics variables."""
+TIME_STEP = 0.1
 WORLD = b2World(gravity=(0, 0), doSleep=True)
 FRICTION = 0.5
 # 'POLYGON_SHAPES' is a list of (minimum radius, maximum radius, number of vertices) tuples.
 POLYGON_SHAPES = [(1, 1, 15), (0.75, 1, 12), (0.5, 1, 9), (0.25, 1, 6)]
+DAMPING_FACTOR = 1 - ((1 - 0.5) / 3)
 
 
 class Polygon:
     def __init__(self, position=None, vertices=None, shape=0, color=None):
         if vertices is None:
-            self.vertices = polygon(*POLYGON_SHAPES[shape])
+            self.vertices = np.array(polygon(*POLYGON_SHAPES[shape]))
         else:
-            self.vertices = vertices
+            self.vertices = np.array(vertices)
         if position is None:
             self.position = np.random.uniform(low=4, high=8, size=2)
         else:
@@ -36,7 +40,8 @@ class Polygon:
         else:
             self.color = color
         self.body = WORLD.CreateDynamicBody(position=self.position.tolist(), allowSleep=False)
-        self.fixture = self.body.CreatePolygonFixture(density=1, vertices=self.vertices, friction=FRICTION)
+        self.fixture = self.body.CreatePolygonFixture(density=1, vertices=self.vertices.tolist(), friction=FRICTION)
+        self.bounding_circle_radius = math.sqrt(max(self.vertices[:, 0]**2 + self.vertices[:, 1]**2))
     
     def distance(self, other_polygon):
         transform1 = b2Transform()
@@ -61,6 +66,82 @@ class State:
         vertices = [(v[0], SCREEN_HEIGHT - v[1]) for v in vertices]
         pygame.draw.polygon(self.screen, color, vertices)  # inside rectangle
         pygame.draw.polygon(self.screen, BLACK, vertices, 5)  # boundary of rectangle
+        
+    def apply_push(self, start_pt, end_pt, path, display=False, check_reachable=True):
+        if display:
+            images = []
+            if not os.path.exists(path):
+                os.makedirs(path)
+            self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+            pygame.display.iconify()
+            self.screen.fill(WHITE)
+        start_pt = np.array(start_pt)
+        end_pt = np.array(end_pt)
+        self.rod = WORLD.CreateKinematicBody(position=(start_pt[0], start_pt[1]), allowSleep=False)
+        self.rodfix = self.rod.CreatePolygonFixture(vertices=[(0.1, 0.1), (-0.1, 0.1), (-0.1, -0.1), (0.1, -0.1)])
+        vector = np.array(normalize(end_pt - np.array(start_pt)))
+        # reachability check
+        if check_reachable:
+            vertices_lst = [(0.0, 0.1), (0.0, -0.1), (-0.3, -0.1), (-0.3, 0.1)]
+            testrod = WORLD.CreateKinematicBody(position=(start_pt[0], start_pt[1]), allowSleep=False)
+            testrodfix = testrod.CreatePolygonFixture(vertices=[rotatePt(pt, vector) for pt in vertices_lst])
+            while (np.count_nonzero(np.array([o.dist_rod(testrodfix, testrod) for o in self.objects]) <= 0) > 0):
+                start_pt -= 0.1 * vector
+                testrod.DestroyFixture(testrodfix)
+                WORLD.DestroyBody(testrod)
+                testrod = WORLD.CreateKinematicBody(position=(start_pt[0], start_pt[1]), allowSleep=False)
+                testrodfix = testrod.CreatePolygonFixture(vertices=[rotatePt(pt, vector) for pt in vertices_lst])
+            testrod.DestroyFixture(testrodfix)
+            WORLD.DestroyBody(testrod)
+        self.rod.linearVelocity[0] = vector[0]
+        self.rod.linearVelocity[1] = vector[1]
+        self.rod.angularVelocity = 0.0
+        timestamp = 0
+        # display
+        if display:
+            for obj in self.objects:
+                obj.fixture.shape.draw(obj.fixture.shape, obj.body, obj.color)
+            self.rodfix.shape.draw(self.rodfix.shape, self.rod, (0, 0, 0, 255))
+            img_path = os.path.join(path, '0.png')
+            pygame.image.save(self.screen, img_path)
+            images.append(imageio.imread(img_path))
+            os.remove(img_path)
+        first_contact = -1
+        while (timestamp < 100):
+            if first_contact == -1:
+                for i in range(len(self.objects)):
+                    # if object is moving, classify it as contacted
+                    if (self.objects[i].body.linearVelocity[0] ** 2 + self.objects[i].body.linearVelocity[1] ** 2 > 0.001):
+                        first_contact = i
+            for obj in self.objects:
+                obj.body.linearVelocity[0] *= DAMPING_FACTOR
+                obj.body.linearVelocity[1] *= DAMPING_FACTOR
+                obj.body.angularVelocity *= DAMPING_FACTOR
+            if (math.sqrt(np.sum((start_pt - np.array(self.rod.position)) ** 2)) < 4):
+                vector = normalize((end_pt + 1e-8) - (start_pt + 1e-8))
+                self.rod.linearVelocity[0] = vector[0]
+                self.rod.linearVelocity[1] = vector[1]
+            else:
+                self.rod.linearVelocity[0] = 0
+                self.rod.linearVelocity[1] = 0
+            WORLD.Step(TIME_STEP, 10, 10)
+            timestamp += 1
+            # display
+            if display:
+                self.screen.fill((255, 255, 255, 255))
+                for obj in self.objects:
+                    obj.fixture.shape.draw(obj.fixture.shape, obj.body, obj.color)
+                self.rodfix.shape.draw(self.rodfix.shape, self.rod, (0, 0, 0, 255))
+                img_path = os.path.join(path, str(timestamp) + '.png')
+                pygame.image.save(self.screen, img_path)
+                images.append(imageio.imread(img_path))
+                os.remove(img_path)
+        # display
+        if display:
+            pygame.display.quit()
+            pygame.quit()
+            imageio.mimsave(os.path.join(path, 'push.gif'), images)
+        return first_contact
 
     def clear(self):
         """Remove all objects."""
@@ -118,9 +199,17 @@ class State:
 
 
 if __name__ == "__main__":
-    num_env = 5
-    for i in range(num_env):
-        env = State()
-        env.create_random_env(num_objs=5)
-        env.visualize("./%d.png"%i)
-        print("env%d:"%i, env.count_soft_threshold())
+    env = State()
+    env.create_random_env(num_objs=5)
+    print("before")
+    print("count_soft_threshold:", env.count_soft_threshold())
+    for i in range(len(env.objects)):
+        print("position%d:"%i, env.objects[i].body.position)
+        print("angle%d:"%i, env.objects[i].body.angle)
+    push = random.choice(no_prune(env))
+    env.apply_push(push[0],push[1], "./push", display=True, check_reachable=False)
+    print("after")
+    print("count_soft_threshold:", env.count_soft_threshold())
+    for i in range(len(env.objects)):
+        print("position%d:"%i, env.objects[i].body.position)
+        print("angle%d:"%i, env.objects[i].body.angle)

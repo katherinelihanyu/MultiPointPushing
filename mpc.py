@@ -68,7 +68,6 @@ def collect_sequential_sample(complete_pt_lst, summary, model, reuse, max_step, 
         result = {}
         env = singulation_env_simulation.SingulationEnv()
         env.load_env(summary)
-        curr = env.save_env()
         assert compare_soft_threshold(model, env)
         info["env before push"] = env.save_env()
         for i in range(max_step):
@@ -106,8 +105,6 @@ def collect_sequential_sample(complete_pt_lst, summary, model, reuse, max_step, 
 
 
 def sampling_every_step(summary, data_path, num_samples, num_steps, reuse, reuse_path=None, metric="count soft threshold", timeit=False):
-    first_time = datetime.datetime.now().replace(microsecond=0)
-    cur_time = datetime.datetime.now().replace(microsecond=0)
     reuse_step_path = None
     env = singulation_env_simulation.SingulationEnv()
     env.load_env(summary)

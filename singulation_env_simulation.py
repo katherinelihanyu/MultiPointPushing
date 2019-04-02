@@ -263,11 +263,9 @@ class SingulationEnv:
             # display
             if display:
                 self.screen.fill((255, 255, 255, 255))
-
                 for obj in self.objs:
                     for fix in obj.fixtures:
                         fix.shape.draw(fix.shape, obj.body, obj.color)
-
                 self.rodfix.shape.draw(self.rodfix.shape, self.rod, (0, 0, 0, 255))
                 img_path = os.path.join(path, str(timestamp) + '.png')
                 pygame.image.save(self.screen, img_path)
@@ -505,11 +503,15 @@ class SingulationEnv:
             obj.body.angularVelocity = 0.0
 
 if __name__ == "__main__":
-    num_env = 3
-    for i in range(num_env):
-        env = SingulationEnv()
-        env.create_random_env_wrapper(num_objs=5)
-        print("before%d:"%i, env.count_soft_threshold())
-        push = random.choice(no_prune(env))
-        env.step(push[0],push[1], "./no_reach/push%d"%i, display=True, check_reachable=False)
-        print("after%d:"%i, env.count_soft_threshold())
+    env = SingulationEnv()
+    env.create_random_env_wrapper(num_objs=5)
+    print("before")
+    print("count_soft_threshold:", env.count_soft_threshold())
+    for i in range(len(env.objs)):
+        print("position%d:"%i, env.objs[i].body.position)
+    push = random.choice(no_prune(env))
+    env.step(push[0],push[1], "./no_reach/push%d"%i, display=True, check_reachable=False)
+    print("after")
+    print("count_soft_threshold:", env.count_soft_threshold())
+    for i in range(len(env.objs)):
+        print("position%d:"%i, env.objs[i].body.position)
