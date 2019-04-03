@@ -200,8 +200,6 @@ class State:
             self.push(vec[0], vec[1], display=display, path=os.path.join(path, str(i)))
         actions_tuple = tuple(actions.flatten())
         final_score = metric()
-        print("after", self.count_soft_threshold())
-        assert final_score == self.count_soft_threshold()
         return final_score, actions_tuple
 
     def save(self):
@@ -226,9 +224,7 @@ class State:
 if __name__ == "__main__":
     env = State()
     env.create_random_env(num_objs=5)
-    print("before count", env.count_soft_threshold())
     final_score, actions_tuple = env.sample(num_steps=3, prune_method=no_prune, metric=env.count_soft_threshold, display=True, path="./push")
-    print("after count", final_score)
     print(actions_tuple)
     
 
