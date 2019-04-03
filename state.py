@@ -69,10 +69,17 @@ class State:
         b2PolygonShape.draw = self.__draw_polygon
 
     def __draw_polygon(self, polygon, body, color):
-        vertices = [(body.transform * v) * PPM for v in polygon.vertices]
+        vertices = [body.transform * v * PPM for v in polygon.vertices]
         vertices = [(v[0], SCREEN_HEIGHT - v[1]) for v in vertices]
         pygame.draw.polygon(self.screen, color, vertices)  # inside rectangle
         pygame.draw.polygon(self.screen, BLACK, vertices, 5)  # boundary of rectangle
+    
+    def __draw_line(self, start, end, color=BLACK, width=5):
+        start*=PPM
+        start = (start[0], SCREEN_HEIGHT-start[1])
+        end*=PPM
+        end = (end[0], SCREEN_HEIGHT-end[1])
+        pygame.draw.line(self.screen, color, start, end, width)
 
     def clear(self):
         """Remove all objects."""
@@ -150,10 +157,11 @@ class State:
             for obj in self.objects:
                 obj.fixture.shape.draw(obj.fixture.shape, obj.body, obj.color)
             self.rodfix.shape.draw(self.rodfix.shape, self.rod, (0, 0, 0, 255))
+            self.__draw_line(start_pt, end_pt)
             img_path = os.path.join(path, '0.png')
             pygame.image.save(self.screen, img_path)
             images.append(imageio.imread(img_path))
-            os.remove(img_path)
+            # os.remove(img_path)
         first_contact = -1
         while (timestamp < 100):
             if first_contact == -1:
@@ -180,10 +188,11 @@ class State:
                 for obj in self.objects:
                     obj.fixture.shape.draw(obj.fixture.shape, obj.body, obj.color)
                 self.rodfix.shape.draw(self.rodfix.shape, self.rod, (0, 0, 0, 255))
+                self.__draw_line(start_pt, end_pt)
                 img_path = os.path.join(path, str(timestamp) + '.png')
                 pygame.image.save(self.screen, img_path)
                 images.append(imageio.imread(img_path))
-                os.remove(img_path)
+                # os.remove(img_path)
         # display
         if display:
             pygame.display.quit()
@@ -193,14 +202,19 @@ class State:
 
     def sample(self, num_steps, prune_method, metric, display=False, path=None):
         """Collect a sample of length num_steps"""
-        actions = np.zeros((num_steps,4))
+        before_sampling = self.save()
+        print("before_sampling", before_sampling)
+        print("count", self.count_soft_threshold())
+        actions = []
         for i in range(num_steps):
             vec = random.choice(prune_method(self))
-            actions[i] = np.hstack((vec[0],vec[1])).flatten()
-            self.push(vec[0], vec[1], display=display, path=os.path.join(path, str(i)))
-        actions_tuple = tuple(actions.flatten())
+            actions.extend(vec[0].tolist() + vec[1].tolist())
+            self.push(vec[0], vec[1], display=display, path=path)
+            print("after_sampling", self.save())
+            print("count", self.count_soft_threshold())
         final_score = metric()
-        return final_score, actions_tuple
+        self.load(before_sampling)
+        return final_score, tuple(actions)
 
     def save(self):
         """Save information about current state in a dictionary in sum_path/env.json"""
@@ -220,11 +234,7 @@ class State:
         pygame.display.quit()
         pygame.quit()
 
-
 if __name__ == "__main__":
     env = State()
     env.create_random_env(num_objs=5)
-    final_score, actions_tuple = env.sample(num_steps=3, prune_method=no_prune, metric=env.count_soft_threshold, display=True, path="./push")
-    print(actions_tuple)
-    
-
+    final_score, actions_tuple = env.sample(num_steps=1, prune_method=no_prune, metric=env.count_soft_threshold, display=True, path="./draw")

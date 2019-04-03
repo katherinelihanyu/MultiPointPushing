@@ -16,7 +16,10 @@ def no_prune(env):
 			continue
 		pt1 = (math.cos(theta1) * env.objects[obj_ind].bounding_circle_radius, math.sin(theta1) * env.objects[obj_ind].bounding_circle_radius)
 		pt2 = (math.cos(theta2) * env.objects[obj_ind].bounding_circle_radius, math.sin(theta2) * env.objects[obj_ind].bounding_circle_radius)
-		pts = parametrize_by_bounding_circle(np.array(pt1) + np.array([env.objects[obj_ind].body.position[0], env.objects[obj_ind].body.position[1]]), np.array(pt2) - np.array(pt1), np.array([env.objects[obj_ind].body.position[0], env.objects[obj_ind].body.position[1]]), env.objects[obj_ind].bounding_circle_radius+0.1)
+		pts = parametrize_by_bounding_circle(np.array(pt1) + np.array([env.objects[obj_ind].body.position[0], env.objects[obj_ind].body.position[1]]),
+											 np.array(pt2) - np.array(pt1),
+											 np.array([env.objects[obj_ind].body.position[0], env.objects[obj_ind].body.position[1]]),
+											 env.objects[obj_ind].bounding_circle_radius+0.1)
 		if pts is not None:
 			pt_lst.append(pts)
 	return pt_lst
