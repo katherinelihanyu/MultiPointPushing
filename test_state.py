@@ -29,7 +29,7 @@ class TestState(unittest.TestCase):
     #     np.testing.assert_array_equal(before_summary, env.save())
 
     def test_sampling_reproducible_same_env(self):
-        num_steps = 1
+        num_steps = 2
         test_env = State()
         test_env.create_random_env(num_objs=2)
         before_summary = test_env.save()
@@ -39,10 +39,16 @@ class TestState(unittest.TestCase):
             start_pt = np.array([actions[i*4], actions[i*4+1]])
             end_pt = np.array([actions[i*4+2], actions[i*4+3]])
             test_env.push(start_pt, end_pt, display=True, path="./push" + str(i))
+        print("np.max(final_state - env.save())", np.max(final_state - test_env.save()))
+        print("final_state - env.save()")
+        print(final_state - test_env.save())
         print("final state")
         print(final_state)
         print("env.save()")
         print(test_env.save())
+        print("final_score - test_env.count_soft_threshold()", final_score - test_env.count_soft_threshold())
+        print("final_score", final_score)
+        print("test_env.count_soft_threshold()", test_env.count_soft_threshold())
         np.testing.assert_allclose(final_state, test_env.save())
         self.assertEqual(final_score, test_env.count_soft_threshold())
 

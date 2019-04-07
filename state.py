@@ -144,6 +144,11 @@ class State:
 
     def load(self, summary):
         """Load environment defined by summary (an output from save)"""
+        if self.rod:
+            self.rod.DestroyFixture(self.rodfix)
+            self.world.DestroyBody(self.rod)
+            self.rod = None
+
         for i, obj in enumerate(self.objects):
             obj.body.position[0], obj.body.position[1], obj.body.angle = summary[i]
             obj.body.linearVelocity[0] = 0.0
