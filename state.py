@@ -244,10 +244,10 @@ class State:
                 self.push(vec[0], vec[1], display=display, path=path)
             # print("after_sampling", self.save())
             # print("count", self.count_soft_threshold())
-        final_score = metric()
+        final_score_sample = metric()
         final_state = self.save()
         self.load(before_sampling)
-        return final_score, tuple(actions), final_state
+        return final_score_sample, tuple(actions), final_state
 
     def save(self):
         """Save information about current state in a dictionary in sum_path/env.json"""
@@ -274,7 +274,7 @@ class State:
 if __name__ == "__main__":
     env = State()
     env.create_random_env(num_objs=5)
-    # final_score, actions_tuple = env.sample(num_steps=1, prune_method=no_prune, metric=env.count_soft_threshold, display=True, path="./draw")
+    final_score, actions_tuple = env.sample(num_steps=1, prune_method=no_prune, metric=env.count_soft_threshold, display=True, path="./draw")
     env.visualize("./no_angle.png")
     print("BEFORE")
     print(env.save())
