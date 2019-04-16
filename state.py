@@ -74,27 +74,32 @@ class State:
     def __init__(self, objects=[]):
         self.world = b2World(gravity=(0, 0), doSleep=True)
         self.objects = objects
-        b2PolygonShape.draw = self.__draw_polygon
+        b2PolygonShape.draw = State.__draw_polygon
         self.screen = None
         self.rod = None
         self.rodfix = None
 
-    def __draw_polygon(self, obj, body, color, screen):
+    @staticmethod
+    def __draw_polygon(obj, body, color, screen):
         vertices = [body.transform * v * PPM for v in obj.vertices]
         vertices = [(v[0], SCREEN_HEIGHT - v[1]) for v in vertices]
         pygame.draw.polygon(screen, color, vertices)  # inside rectangle
         pygame.draw.polygon(screen, BLACK, vertices, 5)  # boundary of rectangle
-    
-    def __draw_line(self, start, end, color=BLACK, width=5):
-        start*=PPM
-        start = (start[0], SCREEN_HEIGHT-start[1])
-        end*=PPM
-        end = (end[0], SCREEN_HEIGHT-end[1])
-        pygame.draw.line(self.screen, color, start, end, width)
+
+    def best_sample(self, num_sample, sample_func):
+            best_result = 0
+            best_push = None
+            for _ in range(num_sample):
+                sample_env = self.copy()
+                result, action = sample_func(sample_env)
+                if result > best_result:
+                    best_result = result
+                    best_push = action
+            return best_result, best_push
 
     def copy(self):
         state_copy = State()
-        state_copy.objects =[obj.copy(state_copy.world) for obj in self.objects]
+        state_copy.objects = [obj.copy(state_copy.world) for obj in self.objects]
         return state_copy
 
     def clear(self):
@@ -142,20 +147,35 @@ class State:
             assert obj.body.linearVelocity[1] == 0.0
             assert obj.body.angularVelocity == 0.0
 
+    def greedy_step(self, prune_method, metric):
+        pushes = prune_method(self)
+        summary = self.save()
+        best_push = None
+        best_performance = metric()
+        for action in pushes:
+            self.load(summary)
+            self.push(action)
+            curr_score = metric()
+            if curr_score > best_performance:
+                best_push = action
+                best_performance = curr_score
+        self.load(summary)
+        return best_performance, best_push
+
     def load(self, summary):
         """Load environment defined by summary (an output from save)"""
         if self.rod:
             self.rod.DestroyFixture(self.rodfix)
             self.world.DestroyBody(self.rod)
             self.rod = None
-
         for i, obj in enumerate(self.objects):
             obj.body.position[0], obj.body.position[1], obj.body.angle = summary[i]
             obj.body.linearVelocity[0] = 0.0
             obj.body.linearVelocity[1] = 0.0
             obj.body.angularVelocity = 0.0
 
-    def push(self, start_pt, end_pt, path=None, display=False, check_reachable=True):
+    def push(self, action, path=None, display=False, check_reachable=True):
+        start_pt, end_pt = action
         if display:
             images = []
             if not os.path.exists(path):
@@ -184,8 +204,8 @@ class State:
         # display
         if display:
             for obj in self.objects:
-                obj.fixture.shape.draw(obj, obj.body, obj.color, self.screen)
-            self.rodfix.shape.draw(self.rodfix.shape, self.rod, (0, 0, 0, 255), self.screen)
+                obj.fixture.shape.draw(obj.body, obj.color, self.screen)
+            self.rodfix.shape.draw(self.rod, (0, 0, 0, 255), self.screen)
             # self.__draw_line(start_pt, end_pt)
             img_path = os.path.join(path, '0.png')
             pygame.image.save(self.screen, img_path)
@@ -215,8 +235,8 @@ class State:
             if display:
                 self.screen.fill((255, 255, 255, 255))
                 for obj in self.objects:
-                    obj.fixture.shape.draw(obj.fixture.shape, obj.body, obj.color, self.screen)
-                self.rodfix.shape.draw(self.rodfix.shape, self.rod, (0, 0, 0, 255), self.screen)
+                    obj.fixture.shape.draw(obj.body, obj.color, self.screen)
+                self.rodfix.shape.draw(self.rod, (0, 0, 0, 255), self.screen)
                 # self.__draw_line(start_pt, end_pt)
                 img_path = os.path.join(path, str(timestamp) + '.png')
                 pygame.image.save(self.screen, img_path)
@@ -232,22 +252,17 @@ class State:
     def sample(self, num_steps, prune_method, metric, display=False, path=None):
         """Collect a sample of length num_steps"""
         before_sampling = self.save()
-        # print("before_sampling", before_sampling)
-        # print("count", self.count_soft_threshold())
         actions = []
         for i in range(num_steps):
             vec = random.choice(prune_method(self))
             actions.extend(vec[0].tolist() + vec[1].tolist())
-            if path != None:
+            if path is not None:
                 self.push(vec[0], vec[1], display=display, path=path+str(i))
             else:
                 self.push(vec[0], vec[1], display=display, path=path)
-            # print("after_sampling", self.save())
-            # print("count", self.count_soft_threshold())
         final_score_sample = metric()
-        final_state = self.save()
         self.load(before_sampling)
-        return final_score_sample, tuple(actions), final_state
+        return final_score_sample, tuple(actions)
 
     def save(self):
         """Save information about current state in a dictionary in sum_path/env.json"""
@@ -262,26 +277,21 @@ class State:
         pygame.display.iconify()
         self.screen.fill(WHITE)
         for obj in self.objects:
-            obj.fixture.shape.draw(obj.fixture.shape, obj.body, obj.color)
+            obj.fixture.shape.draw(obj.body, obj.color, self.screen)
         pygame.image.save(self.screen, path)
         pygame.display.quit()
         pygame.quit()
 
-    def print_vertices(self):
-        pass
-
 
 if __name__ == "__main__":
+    num_samples = 5
     env = State()
     env.create_random_env(num_objs=5)
-    final_score, actions_tuple = env.sample(num_steps=1, prune_method=no_prune, metric=env.count_soft_threshold, display=True, path="./draw")
-    env.visualize("./no_angle.png")
-    print("BEFORE")
-    print(env.save())
-    print("BEOFRE VERTICES")
-    print(env.objects[0].vertices)
-    env.objects[0].body.angle = 1.03780246e+00
-    env.visualize(("./angle.png"))
-    print("AFTER VERTICES")
-    print(env.save())
-    print(env.objects[0].vertices)
+    env.visualize("state.png")
+    print("starting score", env.count_soft_threshold())
+    best_score, best_action = env.greedy_step(no_prune, env.count_soft_threshold)
+    print("best_score", best_score)
+    print("best_action", best_action)
+    print("starting score2", env.count_soft_threshold())
+    env.push(best_action)
+    print("best_score", env.count_soft_threshold())

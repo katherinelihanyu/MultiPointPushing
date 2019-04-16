@@ -280,6 +280,7 @@ def plot(num_samples_lst, means, stds, num_objects,num_trials,num_steps,path):
     plt.ylabel('Count threshold')
     plt.savefig(path)
 
+
 if __name__ == "__main__":
     num_objects = 10
     num_trials = 1

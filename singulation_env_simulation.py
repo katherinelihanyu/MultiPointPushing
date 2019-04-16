@@ -502,16 +502,17 @@ class SingulationEnv:
             obj.body.linearVelocity[1] = 0.0
             obj.body.angularVelocity = 0.0
 
+
 if __name__ == "__main__":
     env = SingulationEnv()
     env.create_random_env_wrapper(num_objs=5)
     print("before")
     print("count_soft_threshold:", env.count_soft_threshold())
     for i in range(len(env.objs)):
-        print("position%d:"%i, env.objs[i].body.position)
+        print("position%d:" % i, env.objs[i].body.position)
     push = random.choice(no_prune(env))
-    env.step(push[0],push[1], "./no_reach/push%d"%i, display=True, check_reachable=False)
+    env.step(push[0], push[1], "./no_reach/push", display=True, check_reachable=False)
     print("after")
     print("count_soft_threshold:", env.count_soft_threshold())
     for i in range(len(env.objs)):
-        print("position%d:"%i, env.objs[i].body.position)
+        print("position:", env.objs[i].body.position)
