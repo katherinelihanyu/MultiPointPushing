@@ -176,39 +176,6 @@ def sampling_open_loop(summary, data_path, num_samples, num_steps, reuse, metric
     return best_summary[metric + " after push"]
 
 
-def sampling_last_step_greedy(summary, data_path, num_samples, num_steps, reuse, metric="count soft threshold", timeit=False):
-    first_time = datetime.datetime.now().replace(microsecond=0)
-    cur_time = datetime.datetime.now().replace(microsecond=0)
-    env = singulation_env_simulation.SingulationEnv()
-    env.load_env(summary)
-    for i in range(num_steps-1):
-        print("step", i)
-        actual_step_path = os.path.join(data_path, "actual_step"+str(i))
-        if not os.path.exists(actual_step_path):
-            os.makedirs(actual_step_path)
-        best_result, best_pts = env.best_sequential_sample(num_samples, no_prune, reuse=reuse, max_step=num_steps-i,
-                                                           data_path=actual_step_path, metric=metric,)
-        best_summary = env.collect_data_summary(best_pts[0], best_pts[1], img_path=os.path.join(actual_step_path, "render"), display=True)
-        print(metric + " before push", best_summary[metric + " before push"], "projected reward at step %d: %.2f" % (i + 3, best_result))
-        print(metric + " after push", best_summary[metric + " after push"])
-        if timeit:
-            print("sampling step %d took"%i, datetime.datetime.now().replace(microsecond=0) - cur_time)
-            cur_time = datetime.datetime.now().replace(microsecond=0)
-    print("step", num_steps-1)
-    curr_pos = env.save_curr_position()
-    actual_step_path = os.path.join(data_path, "actual_step" + str(num_steps-1))
-    if not os.path.exists(actual_step_path):
-        os.makedirs(actual_step_path)
-    best_pts = env.prune_best(prune_method=no_prune, metric=metric, position=curr_pos)
-    best_summary = env.collect_data_summary(best_pts[0], best_pts[1], img_path=os.path.join(actual_step_path, "render"), display=True)
-    print(metric + " before push", best_summary[metric + " before push"])
-    print(metric + " after push", best_summary[metric + " after push"])
-    if timeit:
-        print("sampling step %d took" % (num_steps-1), datetime.datetime.now().replace(microsecond=0) - cur_time)
-        print("sampling took", datetime.datetime.now().replace(microsecond=0) - first_time)
-    return best_summary[metric + " after push"]
-
-
 def greedy_sequential(summary, num_steps, data_path, metric="count soft threshold", display=False, num_samples=None, reuse=False, timeit=False):
     cur_time = time.time()
     test = singulation_env_simulation.SingulationEnv()
@@ -255,7 +222,7 @@ def greedy_sequential(summary, num_steps, data_path, metric="count soft threshol
     return best_summary[metric + " after push"]
 
 
-def run_experiments(num_trials,data_path, func, reuse):
+def run_experiments(num_trials, data_path, func, reuse):
     lst = []
     for i in range(num_trials):
         result = run_heap(data_path, i, func, reuse)
@@ -279,6 +246,39 @@ def plot(num_samples_lst, means, stds, num_objects,num_trials,num_steps,path):
     plt.xlabel('Number of samples')
     plt.ylabel('Count threshold')
     plt.savefig(path)
+
+
+def sampling_last_step_greedy(summary, data_path, num_samples, num_steps, reuse, metric="count soft threshold", timeit=False):
+    first_time = datetime.datetime.now().replace(microsecond=0)
+    cur_time = datetime.datetime.now().replace(microsecond=0)
+    env = singulation_env_simulation.SingulationEnv()
+    env.load_env(summary)
+    for i in range(num_steps-1):
+        print("step", i)
+        actual_step_path = os.path.join(data_path, "actual_step"+str(i))
+        if not os.path.exists(actual_step_path):
+            os.makedirs(actual_step_path)
+        best_result, best_pts = env.best_sequential_sample(num_samples, no_prune, reuse=reuse, max_step=num_steps-i,
+                                                           data_path=actual_step_path, metric=metric,)
+        best_summary = env.collect_data_summary(best_pts[0], best_pts[1], img_path=os.path.join(actual_step_path, "render"), display=True)
+        print(metric + " before push", best_summary[metric + " before push"], "projected reward at step %d: %.2f" % (i + 3, best_result))
+        print(metric + " after push", best_summary[metric + " after push"])
+        if timeit:
+            print("sampling step %d took"%i, datetime.datetime.now().replace(microsecond=0) - cur_time)
+            cur_time = datetime.datetime.now().replace(microsecond=0)
+    print("step", num_steps-1)
+    curr_pos = env.save_curr_position()
+    actual_step_path = os.path.join(data_path, "actual_step" + str(num_steps-1))
+    if not os.path.exists(actual_step_path):
+        os.makedirs(actual_step_path)
+    best_pts = env.prune_best(prune_method=no_prune, metric=metric, position=curr_pos)
+    best_summary = env.collect_data_summary(best_pts[0], best_pts[1], img_path=os.path.join(actual_step_path, "render"), display=True)
+    print(metric + " before push", best_summary[metric + " before push"])
+    print(metric + " after push", best_summary[metric + " after push"])
+    if timeit:
+        print("sampling step %d took" % (num_steps-1), datetime.datetime.now().replace(microsecond=0) - cur_time)
+        print("sampling took", datetime.datetime.now().replace(microsecond=0) - first_time)
+    return best_summary[metric + " after push"]
 
 
 if __name__ == "__main__":

@@ -86,17 +86,6 @@ class State:
         pygame.draw.polygon(screen, color, vertices)  # inside rectangle
         pygame.draw.polygon(screen, BLACK, vertices, 5)  # boundary of rectangle
 
-    def best_sample(self, num_sample, sample_func):
-            best_result = 0
-            best_push = None
-            for _ in range(num_sample):
-                sample_env = self.copy()
-                result, action = sample_func(sample_env)
-                if result > best_result:
-                    best_result = result
-                    best_push = action
-            return best_result, best_push
-
     def copy(self):
         state_copy = State()
         state_copy.objects = [obj.copy(state_copy.world) for obj in self.objects]
@@ -147,13 +136,27 @@ class State:
             assert obj.body.linearVelocity[1] == 0.0
             assert obj.body.angularVelocity == 0.0
 
-    def greedy_step(self, prune_method, metric):
+    def greedy(self, num_steps, prune_method, metric):
+        actions = []
+        for _ in range(num_steps):
+            best_performance, best_push = self.greedy_step(prune_method, metric)
+            self.push(best_push)
+            assert self.count_soft_threshold() == best_performance
+            actions.append(best_push)
+        return best_performance, actions
+
+    def greedy_step(self, prune_method, metric, sample_size=None):
         pushes = prune_method(self)
+        if sample_size is None:
+            indices = range(len(pushes))
+        else:
+            indices = np.random.choice(len(pushes), sample_size, replace=False)
         summary = self.save()
         best_push = None
         best_performance = metric()
-        for action in pushes:
+        for i in indices:
             self.load(summary)
+            action = pushes[i]
             self.push(action)
             curr_score = metric()
             if curr_score > best_performance:
@@ -249,20 +252,46 @@ class State:
             imageio.mimsave(os.path.join(path, 'push.gif'), images)
         return first_contact
 
-    def sample(self, num_steps, prune_method, metric, display=False, path=None):
-        """Collect a sample of length num_steps"""
+    def sample(self, num_steps, prune_method, metric, sampled, display=False, path=None):
+        """Collect a sample of length num_steps > 1. For num_steps = 1, use greedy_step with a sample size."""
+        assert num_steps > 1
         before_sampling = self.save()
-        actions = []
-        for i in range(num_steps):
-            vec = random.choice(prune_method(self))
-            actions.extend(vec[0].tolist() + vec[1].tolist())
-            if path is not None:
-                self.push(vec[0], vec[1], display=display, path=path+str(i))
-            else:
-                self.push(vec[0], vec[1], display=display, path=path)
-        final_score_sample = metric()
-        self.load(before_sampling)
-        return final_score_sample, tuple(actions)
+        first_time = True
+        unique = False
+        while first_time or not unique:
+            if not first_time:
+                print("retry")
+            actions = []
+            for i in range(num_steps):
+                pushes = prune_method(self)
+                vec = random.choice(pushes)
+                actions.extend(vec[0].tolist() + vec[1].tolist())
+                if path is not None:
+                    self.push(vec, display=display, path=path+str(i))
+                else:
+                    self.push(vec, display=display, path=path)
+            final_score_sample = metric()
+            self.load(before_sampling)
+            first_time = False
+            actions = tuple(actions)
+            if actions not in sampled:
+                unique = True
+        return final_score_sample, actions
+
+    def sample_best(self, num_sample, sample_func):
+        best_result = 0
+        best_push = None
+        sampled = set()
+        for _ in range(num_sample):
+            sample_env = self.copy()
+            result, action = sample_func(sample_env, sampled)
+            print("action", action)
+            assert action not in sampled
+            sampled.add(action)
+            if result > best_result:
+                best_result = result
+                best_push = action
+        return best_result, best_push
 
     def save(self):
         """Save information about current state in a dictionary in sum_path/env.json"""
@@ -287,11 +316,10 @@ if __name__ == "__main__":
     num_samples = 5
     env = State()
     env.create_random_env(num_objs=5)
-    env.visualize("state.png")
     print("starting score", env.count_soft_threshold())
-    best_score, best_action = env.greedy_step(no_prune, env.count_soft_threshold)
+    env.visualize("state.png")
+    best_score, best_action = env.sample_best(num_sample=num_samples, sample_func=lambda e, sampled: e.sample(
+        num_steps=2, prune_method=no_prune, metric=e.count_soft_threshold, sampled=sampled))
     print("best_score", best_score)
     print("best_action", best_action)
-    print("starting score2", env.count_soft_threshold())
-    env.push(best_action)
-    print("best_score", env.count_soft_threshold())
+
