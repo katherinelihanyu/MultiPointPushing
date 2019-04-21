@@ -49,8 +49,8 @@ class Polygon:
         self.bounding_circle_radius = math.sqrt(max(self.vertices[:, 0]**2 + self.vertices[:, 1]**2))
 
     def copy(self, world):
-        obj_copy = Polygon(world=world,position=self.position, vertices=self.vertices,shape=self.shape,color=self.color,
-                           rod=self.rod)
+        obj_copy = Polygon(world=world, position=self.position, vertices=self.vertices, shape=self.shape,
+                           color=self.color, rod=self.rod)
         return obj_copy
 
     def destroy(self):
