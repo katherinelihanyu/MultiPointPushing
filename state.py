@@ -315,13 +315,6 @@ class State:
 
 
 if __name__ == "__main__":
-    num_samples = 5
-    env = State()
-    env.create_random_env(num_objs=5)
-    print("starting score", env.count_soft_threshold())
-    env.visualize("state.png")
-    best_score, best_action, best_state = env.sample_best(num_sample=num_samples, sample_func=lambda e, sampled: e.sample(
-        num_steps=2, prune_method=no_prune, metric=e.count_soft_threshold, sampled=sampled))
-    print("best_score", best_score)
-    print("best_action", best_action)
-
+    env1 = State()
+    env1.create_random_env(num_objs=10)
+    summary = env1.save()
