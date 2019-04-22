@@ -271,27 +271,29 @@ class State:
                 else:
                     self.push(vec, display=display, path=path)
             final_score_sample = metric()
+            final_state = self.save()
             self.load(before_sampling)
             first_time = False
             actions = tuple(actions)
             if actions not in sampled:
                 unique = True
-        return final_score_sample, actions
+        return final_score_sample, actions, final_state
 
     def sample_best(self, num_sample, sample_func):
         best_result = 0
         best_push = None
+        best_state = None
         sampled = set()
         for _ in range(num_sample):
             sample_env = self.copy()
-            result, action = sample_func(sample_env, sampled)
-            print("action", action)
+            result, action, state = sample_func(sample_env, sampled)
             assert action not in sampled
             sampled.add(action)
             if result > best_result:
                 best_result = result
                 best_push = action
-        return best_result, best_push
+                best_state = state
+        return best_result, best_push, best_state
 
     def save(self):
         """Save information about current state in a dictionary in sum_path/env.json"""
@@ -318,7 +320,7 @@ if __name__ == "__main__":
     env.create_random_env(num_objs=5)
     print("starting score", env.count_soft_threshold())
     env.visualize("state.png")
-    best_score, best_action = env.sample_best(num_sample=num_samples, sample_func=lambda e, sampled: e.sample(
+    best_score, best_action, best_state = env.sample_best(num_sample=num_samples, sample_func=lambda e, sampled: e.sample(
         num_steps=2, prune_method=no_prune, metric=e.count_soft_threshold, sampled=sampled))
     print("best_score", best_score)
     print("best_action", best_action)
