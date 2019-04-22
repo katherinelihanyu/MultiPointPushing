@@ -151,21 +151,21 @@ class State:
             indices = range(len(pushes))
         else:
             indices = np.random.choice(len(pushes), sample_size, replace=False)
-        summary = self.save()
+        summary = self.save_positions()
         best_push = None
         best_performance = metric()
         for i in indices:
-            self.load(summary)
+            self.load_positions(summary)
             action = pushes[i]
             self.push(action)
             curr_score = metric()
             if curr_score > best_performance:
                 best_push = action
                 best_performance = curr_score
-        self.load(summary)
+        self.load_positions(summary)
         return best_performance, best_push
 
-    def load(self, summary):
+    def load_positions(self, summary):
         """Load environment defined by summary (an output from save)"""
         if self.rod:
             self.rod.DestroyFixture(self.rodfix)
@@ -255,7 +255,7 @@ class State:
     def sample(self, num_steps, prune_method, metric, sampled, display=False, path=None):
         """Collect a sample of length num_steps > 1. For num_steps = 1, use greedy_step with a sample size."""
         assert num_steps > 1
-        before_sampling = self.save()
+        before_sampling = self.save_positions()
         first_time = True
         unique = False
         while first_time or not unique:
@@ -271,8 +271,8 @@ class State:
                 else:
                     self.push(vec, display=display, path=path)
             final_score_sample = metric()
-            final_state = self.save()
-            self.load(before_sampling)
+            final_state = self.save_positions()
+            self.load_positions(before_sampling)
             first_time = False
             actions = tuple(actions)
             if actions not in sampled:
@@ -295,7 +295,7 @@ class State:
                 best_state = state
         return best_result, best_push, best_state
 
-    def save(self):
+    def save_positions(self):
         """Save information about current state in a dictionary in sum_path/env.json"""
         summary = np.array([[obj.body.position[0], obj.body.position[1], obj.body.angle] for obj in self.objects])
         return summary
@@ -317,4 +317,4 @@ class State:
 if __name__ == "__main__":
     env1 = State()
     env1.create_random_env(num_objs=10)
-    summary = env1.save()
+    summary = env1.save_positions()

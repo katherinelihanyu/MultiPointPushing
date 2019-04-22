@@ -12,12 +12,12 @@ class TestState(unittest.TestCase):
         for _ in range(NUM_TRIALS):
             env = State()
             env.create_random_env(num_objs=NUM_OBJS)
-            before_summary = env.save()
+            before_summary = env.save_positions()
             before_count = env.count_soft_threshold()
             vec = random.choice(no_prune(env))
             env.push(vec)
-            env.load(before_summary)
-            reloaded_summary = env.save()
+            env.load_positions(before_summary)
+            reloaded_summary = env.save_positions()
             reloaded_count = env.count_soft_threshold()
             np.testing.assert_array_equal(before_summary, reloaded_summary)
             self.assertEqual(before_count, reloaded_count)
@@ -25,9 +25,9 @@ class TestState(unittest.TestCase):
     def test_sampling_preserve_state(self):
         env = State()
         env.create_random_env(num_objs=NUM_OBJS)
-        before_summary = env.save()
+        before_summary = env.save_positions()
         env.sample(num_steps=NUM_STEPS, prune_method=no_prune, metric=env.count_soft_threshold, sampled=set())
-        np.testing.assert_array_equal(before_summary, env.save())
+        np.testing.assert_array_equal(before_summary, env.save_positions())
 
     # def test_sampling_reproducible_same_env(self):
     #     num_steps = 2
@@ -46,16 +46,16 @@ class TestState(unittest.TestCase):
     def test_sampling_reproducible_diff_env(self):
         env1 = State()
         env1.create_random_env(num_objs=NUM_OBJS)
-        before_summary = env1.save()
+        before_summary = env1.save_positions()
         env2 = env1.copy()
-        np.testing.assert_array_equal(before_summary, env2.save())
+        np.testing.assert_array_equal(before_summary, env2.save_positions())
         final_score, actions, final_state = env1.sample(num_steps=NUM_STEPS, prune_method=no_prune, metric=env1.count_soft_threshold, sampled=set())
-        np.testing.assert_array_equal(before_summary, env1.save())
-        np.testing.assert_array_equal(before_summary, env2.save())
+        np.testing.assert_array_equal(before_summary, env1.save_positions())
+        np.testing.assert_array_equal(before_summary, env2.save_positions())
         for i in range(NUM_STEPS):
             action = (np.array([actions[i*4], actions[i*4+1]]), np.array([actions[i*4+2], actions[i*4+3]]))
             env2.push(action)
-        np.testing.assert_array_equal(final_state, env2.save())
+        np.testing.assert_array_equal(final_state, env2.save_positions())
         self.assertEqual(final_score, env2.count_soft_threshold())
     
     def test_best_sample_reproducible(self):
@@ -66,7 +66,7 @@ class TestState(unittest.TestCase):
         for i in range(NUM_STEPS):
             action = (np.array([best_action[i*4], best_action[i*4+1]]), np.array([best_action[i*4+2], best_action[i*4+3]]))
             env.push(action)
-        np.testing.assert_array_equal(best_state, env.save())
+        np.testing.assert_array_equal(best_state, env.save_positions())
         self.assertEqual(best_score, env.count_soft_threshold())
         
 
