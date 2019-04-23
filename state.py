@@ -25,22 +25,33 @@ DAMPING_FACTOR = 1 - ((1 - 0.5) / 3)
 
 
 class Polygon:
-    def __init__(self, world, position=None, vertices=None, shape=0, color=None, rod=False):
+    def __init__(self, world, position=None, vertices=None, shape=0, color=None, rod=False, info=None):
+        # position: numpy array of size (2,)
+        # vertices: numpy array of size (15, 2) for group 0
+        # color: 4-tuple
+        # info: numpy array of size (38,) for group 0
         self.world = world
-        self.shape=shape
-        self.rod = rod
-        if vertices is None:
-            self.vertices = np.array(polygon(*POLYGON_SHAPES[shape]))
+        if info is None:
+            self.shape = shape
+            self.rod = rod
+            if vertices is None:
+                self.vertices = np.array(polygon(*POLYGON_SHAPES[shape]))
+            else:
+                self.vertices = np.array(vertices)
+            if position is None:
+                self.position = np.random.uniform(low=4, high=8, size=2)
+            else:
+                self.position = position
+            if color is None:
+                self.color = random.choice(COLORS)
+            else:
+                self.color = color
         else:
-            self.vertices = np.array(vertices)
-        if position is None:
-            self.position = np.random.uniform(low=4, high=8, size=2)
-        else:
-            self.position = position
-        if color is None:
-            self.color = random.choice(COLORS)
-        else:
-            self.color = color
+            self.shape = info[0]
+            self.rod = bool(info[1])
+            self.position = info[2:4]
+            self.color = info[4:8]
+            self.vertices = np.reshape(info[8:], (-1, 2))
         if rod:
             self.body = self.world.CreateKinematicBody(position=self.position, allowSleep=False)
         else:
@@ -66,8 +77,22 @@ class Polygon:
             shapeA=self.fixture.shape, shapeB=other_polygon.fixture.shape, transformA=transform1, transformB=transform2)[2]
         return dist
 
+    def equal(self, obj):
+        return np.array_equal(self.position, obj.position) and np.array_equal(self.vertices, obj.vertices) \
+               and self.shape == obj.shape and self.rod == obj.rod and np.array_equal(self.color, obj.color)
+
     def overlap(self, other_polygon):
         return self.distance(other_polygon) <= 0
+
+    def save(self):
+        # return a size (38,) numpy array containing the following info in order:
+        # obj.shape -> int
+        # obj.rod -> boolean cast to int
+        # position -> (2,)
+        # color -> (4,)
+        # vertices -> (15, 2) flatten
+        info = np.array([self.shape, int(self.rod)] + self.position.tolist() + list(self.color))
+        return np.hstack((info, self.vertices.flatten()))
 
 
 class State:
@@ -315,6 +340,6 @@ class State:
 
 
 if __name__ == "__main__":
-    env1 = State()
-    env1.create_random_env(num_objs=10)
-    summary = env1.save_positions()
+    env = State()
+    env.create_random_env(num_objs=10)
+    obj = env.objects[0]

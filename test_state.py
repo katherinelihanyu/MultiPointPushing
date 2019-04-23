@@ -7,6 +7,16 @@ NUM_STEPS = 3
 NUM_TRIALS = 10
 NUM_SAMPLES = 3
 
+
+class TestPolygon(unittest.TestCase):
+    def test_save_and_load(self):
+        print("UNICORN")
+        obj = Polygon(world=b2World(gravity=(0, 0), doSleep=True))
+        obj2 = Polygon(world=b2World(gravity=(0, 0), doSleep=True), info=obj.save())
+        self.assertTrue(obj.equal(obj2))
+        self.assertFalse(obj.equal(Polygon(world=b2World(gravity=(0, 0), doSleep=True))))
+
+
 class TestState(unittest.TestCase):
     def test_save_and_load(self):
         for _ in range(NUM_TRIALS):
@@ -68,7 +78,6 @@ class TestState(unittest.TestCase):
             env.push(action)
         np.testing.assert_array_equal(best_state, env.save_positions())
         self.assertEqual(best_score, env.count_soft_threshold())
-        
 
     # def test_greedy_step_reproducible(self):
     #     test_env = State()
