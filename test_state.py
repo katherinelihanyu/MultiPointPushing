@@ -9,16 +9,43 @@ NUM_SAMPLES = 3
 
 
 class TestPolygon(unittest.TestCase):
+    def test_copy(self):
+        obj1 = Polygon(world=b2World(gravity=(0, 0), doSleep=True))
+        obj2 = obj1.copy(world=b2World(gravity=(0, 0), doSleep=True))
+        self.assertTrue(obj1.equal(obj2))
+
+    def test_equal(self):
+        obj = Polygon(world=b2World(gravity=(0, 0), doSleep=True))
+        self.assertFalse(obj.equal(Polygon(world=b2World(gravity=(0, 0), doSleep=True))))
+
     def test_save_and_load(self):
-        print("UNICORN")
         obj = Polygon(world=b2World(gravity=(0, 0), doSleep=True))
         obj2 = Polygon(world=b2World(gravity=(0, 0), doSleep=True), info=obj.save())
         self.assertTrue(obj.equal(obj2))
-        self.assertFalse(obj.equal(Polygon(world=b2World(gravity=(0, 0), doSleep=True))))
 
 
 class TestState(unittest.TestCase):
+    def test_copy(self):
+        env1 = State()
+        env1.create_random_env(num_objs=NUM_OBJS)
+        env2 = env1.copy()
+        self.assertTrue(env1.equal(env2))
+
+    def test_equal(self):
+        env1 = State()
+        env1.create_random_env(num_objs=NUM_OBJS)
+        env2 = State()
+        env2.create_random_env(num_objs=NUM_OBJS)
+        self.assertFalse(env1.equal(env2))
+
     def test_save_and_load(self):
+        env1 = State()
+        env1.create_random_env(num_objs=NUM_OBJS)
+        info, num_ob = env1.save()
+        env2 = State(summary=info, num_objs=num_ob)
+        self.assertTrue(env1.equal(env2))
+
+    def test_save_and_load_positions(self):
         for _ in range(NUM_TRIALS):
             env = State()
             env.create_random_env(num_objs=NUM_OBJS)
@@ -76,7 +103,7 @@ class TestState(unittest.TestCase):
         for i in range(NUM_STEPS):
             action = (np.array([best_action[i*4], best_action[i*4+1]]), np.array([best_action[i*4+2], best_action[i*4+3]]))
             env.push(action)
-        np.testing.assert_array_equal(best_state, env.save_positions())
+        np.testing.assert_allclose(best_state, env.save_positions())
         self.assertEqual(best_score, env.count_soft_threshold())
 
     # def test_greedy_step_reproducible(self):

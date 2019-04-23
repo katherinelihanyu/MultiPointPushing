@@ -96,9 +96,14 @@ class Polygon:
 
 
 class State:
-    def __init__(self, objects=[]):
+    def __init__(self, objects=[], summary=None, num_objs=0):
         self.world = b2World(gravity=(0, 0), doSleep=True)
-        self.objects = objects
+        if summary is None:
+            self.objects = objects
+        else:
+            assert summary.shape[0] % num_objs == 0
+            l = summary.shape[0]//num_objs
+            self.objects = [Polygon(self.world, info=summary[i*l:i*l+l]) for i in range(num_objs)]
         b2PolygonShape.draw = State.__draw_polygon
         self.screen = None
         self.rod = None
@@ -113,7 +118,7 @@ class State:
 
     def copy(self):
         state_copy = State()
-        state_copy.objects = [obj.copy(state_copy.world) for obj in self.objects]
+        state_copy.objects = [object.copy(state_copy.world) for object in self.objects]
         return state_copy
 
     def clear(self):
@@ -160,6 +165,10 @@ class State:
             assert obj.body.linearVelocity[0] == 0.0
             assert obj.body.linearVelocity[1] == 0.0
             assert obj.body.angularVelocity == 0.0
+
+    def equal(self, state):
+        return len(self.objects) == len(state.objects) \
+               and all([self.objects[i].equal(state.objects[i]) for i in range(len(self.objects))])
 
     def greedy(self, num_steps, prune_method, metric):
         actions = []
@@ -320,6 +329,9 @@ class State:
                 best_state = state
         return best_result, best_push, best_state
 
+    def save(self):
+        return np.hstack([object.save() for object in self.objects]), len(self.objects)
+
     def save_positions(self):
         """Save information about current state in a dictionary in sum_path/env.json"""
         summary = np.array([[obj.body.position[0], obj.body.position[1], obj.body.angle] for obj in self.objects])
@@ -342,4 +354,5 @@ class State:
 if __name__ == "__main__":
     env = State()
     env.create_random_env(num_objs=10)
-    obj = env.objects[0]
+    print(env.save().shape)
+    print(env.save())
