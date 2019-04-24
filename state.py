@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 
 from Box2D import (b2Distance, b2PolygonShape, b2Transform, b2World)
 from helpers import *
+from math import isclose
 
 """Display variables."""
 SCREEN_WIDTH, SCREEN_HEIGHT = 720, 720
@@ -174,9 +175,10 @@ class State:
     def greedy(self, num_steps, prune_method, metric):
         actions = []
         for _ in range(num_steps):
-            best_performance, best_push = self.greedy_step(prune_method, metric)
+            best_performance, best_push, best_state = self.greedy_step(prune_method, metric)
             self.push(best_push)
-            assert self.count_soft_threshold() == best_performance
+            if not isclose(best_performance, self.count_soft_threshold(), abs_tol=1e-3):
+                print("GREEDY NOT REPRODUCIBLE. Expected: %s; actual: %s" % (best_performance, self.count_soft_threshold()))
             actions.append(best_push)
         return best_performance, actions
 
@@ -189,6 +191,7 @@ class State:
         summary = self.save_positions()
         best_push = None
         best_performance = metric()
+        best_state = None
         for i in indices:
             self.load_positions(summary)
             action = pushes[i]
@@ -197,8 +200,9 @@ class State:
             if curr_score > best_performance:
                 best_push = action
                 best_performance = curr_score
+                best_state = self.save_positions()
         self.load_positions(summary)
-        return best_performance, best_push
+        return best_performance, best_push, best_state
 
     def load_positions(self, summary):
         """Load environment defined by summary (an output from save)"""

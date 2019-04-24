@@ -93,8 +93,8 @@ class TestState(unittest.TestCase):
         for i in range(NUM_STEPS):
             action = (np.array([actions[i*4], actions[i*4+1]]), np.array([actions[i*4+2], actions[i*4+3]]))
             env2.push(action)
-        np.testing.assert_array_equal(final_state, env2.save_positions())
-        self.assertEqual(final_score, env2.count_soft_threshold())
+        np.testing.assert_allclose(final_state, env2.save_positions())
+        np.testing.assert_almost_equal(final_score, env2.count_soft_threshold())
     
     def test_best_sample_reproducible(self):
         env = State()
@@ -107,14 +107,20 @@ class TestState(unittest.TestCase):
         np.testing.assert_allclose(best_state, env.save_positions())
         self.assertEqual(best_score, env.count_soft_threshold())
 
-    # def test_greedy_step_reproducible(self):
-    #     test_env = State()
-    #     test_env.create_random_env(num_objs=NUM_OBJS)
-    #     starting_score = test_env.count_soft_threshold()
-    #     best_result, best_push = test_env.greedy_step(no_prune, test_env.count_soft_threshold)
-    #     self.assertEqual(starting_score, test_env.count_soft_threshold())
-    #     test_env.push(best_push)
-    #     self.assertEqual(best_result, test_env.count_soft_threshold())
+    def test_greedy_step_reproducible(self):
+        test_env = State()
+        test_env.create_random_env(num_objs=NUM_OBJS)
+        starting_state = test_env.save_positions()
+        starting_score = test_env.count_soft_threshold()
+        best_result, best_push, best_state = test_env.greedy_step(no_prune, test_env.count_soft_threshold)
+        np.testing.assert_array_equal(starting_state, test_env.save_positions())
+        self.assertEqual(starting_score, test_env.count_soft_threshold())
+        test_env.push(best_push, path="push", display=True)
+        print(best_state)
+        print()
+        print(test_env.save_positions())
+        np.testing.assert_allclose(best_state, test_env.save_positions())
+        np.testing.assert_almost_equal(best_result, test_env.count_soft_threshold())
 
 
 if __name__ == '__main__':
