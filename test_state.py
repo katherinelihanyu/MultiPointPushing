@@ -87,7 +87,7 @@ class TestState(unittest.TestCase):
         before_summary = env1.save_positions()
         env2 = env1.copy()
         np.testing.assert_array_equal(before_summary, env2.save_positions())
-        final_score, actions, final_state, first_step_return = env1.sample(num_steps=NUM_STEPS, prune_method=no_prune, metric=env1.count_soft_threshold, sampled=set())
+        final_score, actions, final_state, first_step_return, first_step_end_state = env1.sample(num_steps=NUM_STEPS, prune_method=no_prune, metric=env1.count_soft_threshold, sampled=set())
         np.testing.assert_array_equal(before_summary, env1.save_positions())
         np.testing.assert_array_equal(before_summary, env2.save_positions())
         for i in range(NUM_STEPS):
