@@ -309,6 +309,8 @@ class State:
                     self.push(vec, display=display, path=path+str(i))
                 else:
                     self.push(vec, display=display, path=path)
+                if i == 0:
+                    first_step_return = metric()
             final_score_sample = metric()
             final_state = self.save_positions()
             self.load_positions(before_sampling)
@@ -316,23 +318,39 @@ class State:
             actions = tuple(actions)
             if actions not in sampled:
                 unique = True
-        return final_score_sample, actions, final_state
+        return final_score_sample, actions, final_state, first_step_return
 
     def sample_best(self, num_sample, sample_func):
         best_result = 0
         best_push = None
         best_state = None
+        best_first_step = None
         sampled = set()
         for _ in range(num_sample):
             sample_env = self.copy()
-            result, action, state = sample_func(sample_env, sampled)
+            result, action, state, first_step_return = sample_func(sample_env, sampled)
             assert action not in sampled
             sampled.add(action)
             if result > best_result:
                 best_result = result
                 best_push = action
                 best_state = state
-        return best_result, best_push, best_state
+                best_first_step = first_step_return
+        return best_result, best_push, best_state, best_first_step
+
+    def sample_closed_loop(self, num_sample, sample_func, num_steps):
+        for i in range(num_steps):
+            if num_steps - i == 1:
+                best_performance, best_push, best_state = self.greedy_step(prune_method=no_prune, metric=self.count_soft_threshold, sample_size=200)
+                first_step_return = best_performance
+            else:
+                best_performance, best_push, best_state, first_step_return = self.sample_best(num_sample=num_sample, sample_func=sample_func)
+                best_push = ((best_push[0], best_push[1]), (best_push[2], best_push[3]))
+            self.push(best_push)
+            if not isclose(first_step_return, self.count_soft_threshold(), abs_tol=1e-3):
+                print("CLOSED LOOP NOT REPRODUCIBLE at step %d. Expected: %s; actual: %s" % (i, first_step_return, self.count_soft_threshold()))
+        return best_performance
+
 
     def save(self, path=None):
         info = np.hstack([object.save() for object in self.objects] + [len(self.objects)])

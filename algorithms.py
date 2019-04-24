@@ -27,8 +27,10 @@ def run_heap(data_path, heap_num):
     num_objects = int(info[-1])
     env = State(summary=info, num_objs=num_objects)
     # result, actions = env.greedy(num_steps=3, prune_method=no_prune, metric=env.count_soft_threshold)
-    result, actions, state = env.sample_best(num_sample=200, sample_func=lambda sample_env, sampled: sample_env.sample(
-        num_steps=3, prune_method=no_prune, metric=sample_env.count_soft_threshold, sampled=sampled))
+    # result, actions, state = env.sample_best(num_sample=200, sample_func=lambda sample_env, sampled: sample_env.sample(
+    #     num_steps=3, prune_method=no_prune, metric=sample_env.count_soft_threshold, sampled=sampled))
+    result = env.sample_closed_loop(num_sample=200, sample_func=lambda sample_env, sampled: sample_env.sample(
+        num_steps=3, prune_method=no_prune, metric=sample_env.count_soft_threshold, sampled=sampled), num_steps=3)
     print("heap%d: %s" % (heap_num, result))
     return result
 
