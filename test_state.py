@@ -41,7 +41,8 @@ class TestState(unittest.TestCase):
     def test_save_and_load(self):
         env1 = State()
         env1.create_random_env(num_objs=NUM_OBJS)
-        info, num_ob = env1.save()
+        info = env1.save()
+        num_ob = int(info[-1])
         env2 = State(summary=info, num_objs=num_ob)
         self.assertTrue(env1.equal(env2))
 

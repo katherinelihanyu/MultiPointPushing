@@ -101,9 +101,10 @@ class State:
         if summary is None:
             self.objects = objects
         else:
-            assert summary.shape[0] % num_objs == 0
-            l = summary.shape[0]//num_objs
-            self.objects = [Polygon(self.world, info=summary[i*l:i*l+l]) for i in range(num_objs)]
+            self.objects = []
+            assert (summary.shape[0]-1) % num_objs == 0
+            arr_len = summary.shape[0]//num_objs
+            self.objects = [Polygon(self.world, info=summary[arr_len*i:arr_len*(i+1)]) for i in range(num_objs)]
         b2PolygonShape.draw = State.__draw_polygon
         self.screen = None
         self.rod = None
@@ -329,8 +330,11 @@ class State:
                 best_state = state
         return best_result, best_push, best_state
 
-    def save(self):
-        return np.hstack([object.save() for object in self.objects]), len(self.objects)
+    def save(self, path=None):
+        info = np.hstack([object.save() for object in self.objects] + [len(self.objects)])
+        if path is not None:
+            np.save(path, info)
+        return info
 
     def save_positions(self):
         """Save information about current state in a dictionary in sum_path/env.json"""
@@ -354,5 +358,7 @@ class State:
 if __name__ == "__main__":
     env = State()
     env.create_random_env(num_objs=10)
-    print(env.save().shape)
-    print(env.save())
+    info1 = env.save("ex.npy")
+    print(info1.shape)
+    info2 = np.load("ex.npy")
+    print(np.array_equal(info1, info2))
