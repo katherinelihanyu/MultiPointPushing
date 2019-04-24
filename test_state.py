@@ -87,7 +87,7 @@ class TestState(unittest.TestCase):
         before_summary = env1.save_positions()
         env2 = env1.copy()
         np.testing.assert_array_equal(before_summary, env2.save_positions())
-        final_score, actions, final_state = env1.sample(num_steps=NUM_STEPS, prune_method=no_prune, metric=env1.count_soft_threshold, sampled=set())
+        final_score, actions, final_state, first_step_return = env1.sample(num_steps=NUM_STEPS, prune_method=no_prune, metric=env1.count_soft_threshold, sampled=set())
         np.testing.assert_array_equal(before_summary, env1.save_positions())
         np.testing.assert_array_equal(before_summary, env2.save_positions())
         for i in range(NUM_STEPS):
@@ -99,7 +99,7 @@ class TestState(unittest.TestCase):
     def test_best_sample_reproducible(self):
         env = State()
         env.create_random_env(num_objs=NUM_OBJS)
-        best_score, best_action, best_state = env.sample_best(num_sample=NUM_SAMPLES, sample_func=lambda e, sampled: e.sample(
+        best_score, best_action, best_state, best_first_step = env.sample_best(num_sample=NUM_SAMPLES, sample_func=lambda e, sampled: e.sample(
             num_steps=NUM_STEPS, prune_method=no_prune, metric=e.count_soft_threshold, sampled=sampled))
         for i in range(NUM_STEPS):
             action = (np.array([best_action[i*4], best_action[i*4+1]]), np.array([best_action[i*4+2], best_action[i*4+3]]))
@@ -115,7 +115,7 @@ class TestState(unittest.TestCase):
         best_result, best_push, best_state = test_env.greedy_step(no_prune, test_env.count_soft_threshold)
         np.testing.assert_array_equal(starting_state, test_env.save_positions())
         self.assertEqual(starting_score, test_env.count_soft_threshold())
-        test_env.push(best_push, path="push", display=True)
+        test_env.push(best_push, path="push", display=False)
         print(best_state)
         print()
         print(test_env.save_positions())

@@ -22,7 +22,7 @@ def run_experiments(num_heaps, data_path):
 
 
 def run_heap(data_path, heap_num):
-    path_i =  os.path.join(data_path, "env%d.npy" % heap_num)
+    path_i = os.path.join(data_path, "env%d.npy" % heap_num)
     info = np.load(path_i)
     num_objects = int(info[-1])
     env = State(summary=info, num_objs=num_objects)

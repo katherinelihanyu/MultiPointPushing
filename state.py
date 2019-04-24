@@ -351,7 +351,6 @@ class State:
                 print("CLOSED LOOP NOT REPRODUCIBLE at step %d. Expected: %s; actual: %s" % (i, first_step_return, self.count_soft_threshold()))
         return best_performance
 
-
     def save(self, path=None):
         info = np.hstack([object.save() for object in self.objects] + [len(self.objects)])
         if path is not None:
