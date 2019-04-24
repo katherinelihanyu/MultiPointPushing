@@ -119,7 +119,7 @@ class TestState(unittest.TestCase):
         np.testing.assert_array_equal(starting_state, test_env.save_positions())
         self.assertEqual(starting_score, test_env.count_soft_threshold())
         test_env.push(best_push, path="push", display=False)
-        np.testing.assert_allclose(best_state, test_env.save_positions(), verbose=True)
+        np.testing.assert_allclose(best_state, test_env.save_positions(), err_msg="%s \n %s" % (best_state, test_env.save_positions()))
         np.testing.assert_almost_equal(best_result, test_env.count_soft_threshold())
 
 
