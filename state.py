@@ -341,20 +341,22 @@ class State:
                 best_first_step_end_state = first_step_end_state
         return best_result, best_push, best_state, best_first_step, best_first_step_end_state
 
-    def sample_closed_loop(self, num_sample, sample_func, num_steps):
+    def sample_closed_loop(self, num_steps, num_sample, sample_func):
         for i in range(num_steps):
             if num_steps - i == 1:
-                best_performance, best_push, best_state = self.greedy_step(prune_method=no_prune, metric=self.count_soft_threshold, sample_size=200)
+                best_performance, best_push, best_state = self.greedy_step(prune_method=no_prune, metric=self.count_soft_threshold, sample_size=num_sample)
                 first_step_return = best_performance
             else:
                 best_performance, best_push, best_state, first_step_return, first_step_end_state = self.sample_best(num_sample=num_sample, sample_func=sample_func)
-                best_push = ((best_push[0], best_push[1]), (best_push[2], best_push[3]))
+                best_push =  (np.array([best_push[0], best_push[1]]), np.array([best_push[2], best_push[3]]))
             self.push(best_push)
-            if not isclose(first_step_return, self.count_soft_threshold(), abs_tol=1e-3):
-                print("CLOSED LOOP NOT REPRODUCIBLE at step %d. Expected: %s; actual: %s" % (i, first_step_return, self.count_soft_threshold()))
-                print(first_step_end_state)
-                print()
-                print(self.save_positions())
+            np.testing.assert_allclose(first_step_end_state, self.save_positions(), err_msg="%s \n %s" % (first_step_end_state, self.save_positions()))
+            np.testing.assert_almost_equal(first_step_return, self.count_soft_threshold())
+            # if not isclose(first_step_return, self.count_soft_threshold(), abs_tol=1e-3):
+            #     print("CLOSED LOOP NOT REPRODUCIBLE at step %d. Expected: %s; actual: %s" % (i, first_step_return, self.count_soft_threshold()))
+            #     print(first_step_end_state)
+            #     print()
+            #     print(self.save_positions())
         return best_performance
 
     def save(self, path=None):
@@ -383,9 +385,8 @@ class State:
 
 
 if __name__ == "__main__":
+    NUM_STEPS = 3
     env = State()
     env.create_random_env(num_objs=10)
-    info1 = env.save("ex.npy")
-    print(info1.shape)
-    info2 = np.load("ex.npy")
-    print(np.array_equal(info1, info2))
+    best_performance = env.sample_closed_loop(num_steps=NUM_STEPS, num_sample=1, sample_func=lambda sample_env, sampled: sample_env.sample(num_steps=NUM_STEPS, prune_method=no_prune, metric=sample_env.count_soft_threshold, sampled=sampled))
+    print("best performance", best_performance)
