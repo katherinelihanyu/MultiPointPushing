@@ -207,7 +207,15 @@ class State:
 
     def load_positions(self, summary):
         """Load environment defined by summary (an output from save)"""
-        if self.rod:
+        if summary.shape[0] > len(self.objects):
+            if not self.rod:
+                self.rod = self.world.CreateKinematicBody(position=(summary[len(self.objects)][0], summary[len(self.objects)][1]), allowSleep=False)
+                self.rodfix = self.rod.CreatePolygonFixture(vertices=[(0.1, 0.1), (-0.1, 0.1), (-0.1, -0.1), (0.1, -0.1)])
+            self.rod.position[0], self.rod.position[1], self.rod.angle = summary[len(self.objects)]
+            self.rod.linearVelocity[0] = 0.0
+            self.rod.linearVelocity[1] = 0.0
+            self.rod.angularVelocity = 0.0
+        else:
             self.rod.DestroyFixture(self.rodfix)
             self.world.DestroyBody(self.rod)
             self.rod = None
@@ -233,6 +241,7 @@ class State:
             summary_folder = os.path.join(path, "summary")
             if not os.path.exists(summary_folder):
                 os.makedirs(summary_folder)
+            self.save(os.path.join(summary_folder, "i.npy"))
         start_pt = np.array(start_pt)
         end_pt = np.array(end_pt)
         self.rod = self.world.CreateKinematicBody(position=(start_pt[0], start_pt[1]), allowSleep=False)
@@ -261,7 +270,7 @@ class State:
             if not save_frames:
                 os.remove(img_path)
         if save_summary:
-            self.save(os.path.join(summary_folder, "0.npy"))
+            self.save_positions(os.path.join(summary_folder, "0.npy"))
         first_contact = -1
         while timestamp < 100:
             if first_contact == -1:
@@ -376,7 +385,10 @@ class State:
 
     def save_positions(self, path=None):
         """Save information about current state in a dictionary in sum_path/env.json"""
-        summary = np.array([[obj.body.position[0], obj.body.position[1], obj.body.angle] for obj in self.objects])
+        lst = [[obj.body.position[0], obj.body.position[1], obj.body.angle] for obj in self.objects]
+        if self.rod:
+            lst.append([self.rod.position[0], self.rod.position[1], self.rod.angle])
+        summary = np.array(lst)
         if path is not None:
             np.save(path, summary)
         return summary
@@ -397,25 +409,16 @@ class State:
 def visualize_push(summary_folder, img_folder, save_frames=True):
     if not os.path.exists(img_folder):
         os.makedirs(img_folder)
-    env = State(summary=np.load(os.path.join(summary_folder, "0.npy")))
+    env = State(summary=np.load(os.path.join(summary_folder, "i.npy")))
     env.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     pygame.display.iconify()
-    env.screen.fill(WHITE)
     images = []
-    for obj in env.objects:
-        obj.fixture.shape.draw(obj.body, obj.color, env.screen)
-    # env.rodfix.shape.draw(env.rod, (0, 0, 0, 255), env.screen)
-    img_path = os.path.join(img_folder, '0.png')
-    pygame.image.save(env.screen, img_path)
-    images.append(imageio.imread(img_path))
-    if not save_frames:
-        os.remove(img_path)
-    for timestamp in range(1, 100):
+    for timestamp in range(100):
         env.load_positions(np.load(os.path.join(summary_folder, "%d.npy"%timestamp)))
-        env.screen.fill((255, 255, 255, 255))
+        env.screen.fill(WHITE)
         for obj in env.objects:
             obj.fixture.shape.draw(obj.body, obj.color, env.screen)
-        # env.rodfix.shape.draw(env.rod, (0, 0, 0, 255), env.screen)
+        env.rodfix.shape.draw(env.rod, (0, 0, 0, 255), env.screen)
         img_path = os.path.join(img_folder, '%d.png'%timestamp)
         pygame.image.save(env.screen, img_path)
         images.append(imageio.imread(img_path))
@@ -427,10 +430,9 @@ def visualize_push(summary_folder, img_folder, save_frames=True):
 
 
 if __name__ == "__main__":
-    NUM_STEPS = 3
     env = State()
     env.create_random_env(num_objs=2)
-    summary = env.save()
+    summary = env.save_positions()
     pushes = no_prune(env)
     action = random.choice(pushes)
     env.push(action=action, display=True, save_summary=True, path="opush")
