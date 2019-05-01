@@ -2,7 +2,7 @@ import numpy as np
 import unittest
 from state import *
 
-NUM_OBJS = 5
+NUM_OBJS = 6
 NUM_STEPS = 3
 NUM_SAMPLES = 1
 
@@ -87,12 +87,12 @@ class TestState(unittest.TestCase):
             before_summary = env1.save_positions()
             env2 = env1.copy()
             np.testing.assert_array_equal(before_summary, env2.save_positions())
-            final_score, actions, final_state, first_step_return, first_step_end_state = env1.sample(num_steps=NUM_STEPS, prune_method=no_prune, metric=env1.count_soft_threshold, sampled=set())
+            final_score, actions, final_state, first_step_return, first_step_end_state = env1.sample(num_steps=NUM_STEPS, prune_method=no_prune, metric=env1.count_soft_threshold, sampled=set(), display=True, path="./sample")
             np.testing.assert_array_equal(before_summary, env1.save_positions())
             np.testing.assert_array_equal(before_summary, env2.save_positions())
             for i in range(NUM_STEPS):
                 action = (np.array([actions[i*4], actions[i*4+1]]), np.array([actions[i*4+2], actions[i*4+3]]))
-                env2.push(action)
+                env2.push(action, display=True, path="push%d"%i)
                 if i == 0:
                     np.testing.assert_allclose(first_step_end_state, env2.save_positions(), err_msg="Iteration %d First step \n %s \n %s" % (it, first_step_end_state, env2.save_positions()))
                     np.testing.assert_almost_equal(first_step_return, env2.count_soft_threshold())

@@ -97,12 +97,13 @@ class Polygon:
 
 
 class State:
-    def __init__(self, objects=[], summary=None, num_objs=0):
+    def __init__(self, objects=[], summary=None):
         self.world = b2World(gravity=(0, 0), doSleep=True)
         if summary is None:
             self.objects = objects
         else:
             self.objects = []
+            num_objs = int(summary[-1])
             assert (summary.shape[0]-1) % num_objs == 0
             arr_len = summary.shape[0]//num_objs
             self.objects = [Polygon(self.world, info=summary[arr_len*i:arr_len*(i+1)]) for i in range(num_objs)]
@@ -216,15 +217,22 @@ class State:
             obj.body.linearVelocity[1] = 0.0
             obj.body.angularVelocity = 0.0
 
-    def push(self, action, path=None, display=False, check_reachable=True):
+    def push(self, action, path=None, display=False, save_summary=False, save_frames=True, check_reachable=True):
         start_pt, end_pt = action
+        if not os.path.exists(path):
+            os.makedirs(path)
         if display:
             images = []
-            if not os.path.exists(path):
-                os.makedirs(path)
+            img_folder = os.path.join(path, "image")
+            if not os.path.exists(img_folder):
+                os.makedirs(img_folder)
             self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
             pygame.display.iconify()
             self.screen.fill(WHITE)
+        if save_summary:
+            summary_folder = os.path.join(path, "summary")
+            if not os.path.exists(summary_folder):
+                os.makedirs(summary_folder)
         start_pt = np.array(start_pt)
         end_pt = np.array(end_pt)
         self.rod = self.world.CreateKinematicBody(position=(start_pt[0], start_pt[1]), allowSleep=False)
@@ -243,16 +251,17 @@ class State:
         self.rod.linearVelocity[1] = vector[1]
         self.rod.angularVelocity = 0.0
         timestamp = 0
-        # display
         if display:
             for obj in self.objects:
                 obj.fixture.shape.draw(obj.body, obj.color, self.screen)
             self.rodfix.shape.draw(self.rod, (0, 0, 0, 255), self.screen)
-            # self.__draw_line(start_pt, end_pt)
-            img_path = os.path.join(path, '0.png')
+            img_path = os.path.join(img_folder, '0.png')
             pygame.image.save(self.screen, img_path)
             images.append(imageio.imread(img_path))
-            # os.remove(img_path)
+            if not save_frames:
+                os.remove(img_path)
+        if save_summary:
+            self.save(os.path.join(summary_folder, "0.npy"))
         first_contact = -1
         while timestamp < 100:
             if first_contact == -1:
@@ -273,22 +282,22 @@ class State:
                 self.rod.linearVelocity[1] = 0
             self.world.Step(TIME_STEP, 10, 10)
             timestamp += 1
-            # display
             if display:
                 self.screen.fill((255, 255, 255, 255))
                 for obj in self.objects:
                     obj.fixture.shape.draw(obj.body, obj.color, self.screen)
                 self.rodfix.shape.draw(self.rod, (0, 0, 0, 255), self.screen)
-                # self.__draw_line(start_pt, end_pt)
-                img_path = os.path.join(path, str(timestamp) + '.png')
+                img_path = os.path.join(img_folder, '%d.png'%timestamp)
                 pygame.image.save(self.screen, img_path)
                 images.append(imageio.imread(img_path))
-                # os.remove(img_path)
-        # display
+                if not save_frames:
+                    os.remove(img_path)
+            if save_summary:
+                self.save_positions(os.path.join(summary_folder, "%d.npy"%timestamp))
         if display:
             pygame.display.quit()
             pygame.quit()
-            imageio.mimsave(os.path.join(path, 'push.gif'), images)
+            imageio.mimsave(os.path.join(img_folder, 'push.gif'), images)
         return first_contact
 
     def sample(self, num_steps, prune_method, metric, sampled, display=False, path=None):
@@ -365,12 +374,14 @@ class State:
             np.save(path, info)
         return info
 
-    def save_positions(self):
+    def save_positions(self, path=None):
         """Save information about current state in a dictionary in sum_path/env.json"""
         summary = np.array([[obj.body.position[0], obj.body.position[1], obj.body.angle] for obj in self.objects])
+        if path is not None:
+            np.save(path, summary)
         return summary
 
-    def visualize(self, path):
+    def snapshot(self, path):
         """Capture an image of the current state.
         path: .../something.png
         """
@@ -382,11 +393,47 @@ class State:
         pygame.image.save(self.screen, path)
         pygame.display.quit()
         pygame.quit()
+    
+def visualize_push(summary_folder, img_folder, save_frames=True):
+    if not os.path.exists(img_folder):
+        os.makedirs(img_folder)
+    env = State(summary=np.load(os.path.join(summary_folder, "0.npy")))
+    env.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+    pygame.display.iconify()
+    env.screen.fill(WHITE)
+    images = []
+    for obj in env.objects:
+        obj.fixture.shape.draw(obj.body, obj.color, env.screen)
+    # env.rodfix.shape.draw(env.rod, (0, 0, 0, 255), env.screen)
+    img_path = os.path.join(img_folder, '0.png')
+    pygame.image.save(env.screen, img_path)
+    images.append(imageio.imread(img_path))
+    if not save_frames:
+        os.remove(img_path)
+    for timestamp in range(1, 100):
+        env.load_positions(np.load(os.path.join(summary_folder, "%d.npy"%timestamp)))
+        env.screen.fill((255, 255, 255, 255))
+        for obj in env.objects:
+            obj.fixture.shape.draw(obj.body, obj.color, env.screen)
+        # env.rodfix.shape.draw(env.rod, (0, 0, 0, 255), env.screen)
+        img_path = os.path.join(img_folder, '%d.png'%timestamp)
+        pygame.image.save(env.screen, img_path)
+        images.append(imageio.imread(img_path))
+        if not save_frames:
+            os.remove(img_path)
+    pygame.display.quit()
+    pygame.quit()
+    imageio.mimsave(os.path.join(img_folder, 'push.gif'), images)
 
 
 if __name__ == "__main__":
     NUM_STEPS = 3
     env = State()
-    env.create_random_env(num_objs=10)
-    best_performance = env.sample_closed_loop(num_steps=NUM_STEPS, num_sample=1, sample_func=lambda sample_env, sampled: sample_env.sample(num_steps=NUM_STEPS, prune_method=no_prune, metric=sample_env.count_soft_threshold, sampled=sampled))
-    print("best performance", best_performance)
+    env.create_random_env(num_objs=2)
+    summary = env.save()
+    pushes = no_prune(env)
+    action = random.choice(pushes)
+    env.push(action=action, display=True, save_summary=True, path="opush")
+    visualize_push(summary_folder="opush/summary", img_folder="visual")
+
+
