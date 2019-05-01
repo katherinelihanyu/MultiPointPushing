@@ -225,7 +225,7 @@ class State:
             obj.body.linearVelocity[1] = 0.0
             obj.body.angularVelocity = 0.0
 
-    def push(self, action, path=None, display=False, save_summary=False, save_frames=True, check_reachable=True):
+    def push(self, action, path=None, display=False, save_summary=False, save_frames=False, check_reachable=True):
         start_pt, end_pt = action
         if not os.path.exists(path):
             os.makedirs(path)
@@ -309,7 +309,7 @@ class State:
             imageio.mimsave(os.path.join(img_folder, 'push.gif'), images)
         return first_contact
 
-    def sample(self, num_steps, prune_method, metric, sampled, display=False, path=None):
+    def sample(self, num_steps, prune_method, metric, sampled, display=False, save_summary=False, path=None):
         """Collect a sample of length num_steps > 1. For num_steps = 1, use greedy_step with a sample size."""
         assert num_steps > 1
         before_sampling = self.save_positions()
@@ -324,9 +324,9 @@ class State:
                 vec = random.choice(pushes)
                 actions.extend(vec[0].tolist() + vec[1].tolist())
                 if path is not None:
-                    self.push(vec, display=display, path=path+str(i))
+                    self.push(vec, display=display, save_summary=save_summary, path=path+str(i))
                 else:
-                    self.push(vec, display=display, path=path)
+                    self.push(vec, display=display, save_summary=save_summary, path=path)
                 if i == 0:
                     first_step_end_state = self.save_positions()
                     first_step_return = metric()
@@ -406,7 +406,7 @@ class State:
         pygame.display.quit()
         pygame.quit()
     
-def visualize_push(summary_folder, img_folder, save_frames=True):
+def visualize_push(summary_folder, img_folder, save_frames=False):
     if not os.path.exists(img_folder):
         os.makedirs(img_folder)
     env = State(summary=np.load(os.path.join(summary_folder, "i.npy")))
@@ -430,12 +430,9 @@ def visualize_push(summary_folder, img_folder, save_frames=True):
 
 
 if __name__ == "__main__":
-    env = State()
-    env.create_random_env(num_objs=2)
-    summary = env.save_positions()
-    pushes = no_prune(env)
-    action = random.choice(pushes)
-    env.push(action=action, display=True, save_summary=True, path="opush")
-    visualize_push(summary_folder="opush/summary", img_folder="visual")
-
-
+    # visualize_push(summary_folder="sample0/summary", img_folder="sample_visual0")
+    # visualize_push(summary_folder="push0/summary", img_folder="push_visual0")
+    push_env = State(summary=np.load("push0/summary/i.npy"))
+    push_env.snapshot("push_env.png")
+    sample_env = State(summary=np.load("sample0/summary/i.npy"))
+    sample_env.snapshot("sample_env.png")

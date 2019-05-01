@@ -87,16 +87,16 @@ class TestState(unittest.TestCase):
             before_summary = env1.save_positions()
             env2 = env1.copy()
             np.testing.assert_array_equal(before_summary, env2.save_positions())
-            final_score, actions, final_state, first_step_return, first_step_end_state = env1.sample(num_steps=NUM_STEPS, prune_method=no_prune, metric=env1.count_soft_threshold, sampled=set(), display=True, path="./sample")
+            final_score, actions, final_state, first_step_return, first_step_end_state = env1.sample(num_steps=NUM_STEPS, prune_method=no_prune, metric=env1.count_soft_threshold, sampled=set(), path="./sample", save_summary=True)
             np.testing.assert_array_equal(before_summary, env1.save_positions())
             np.testing.assert_array_equal(before_summary, env2.save_positions())
             for i in range(NUM_STEPS):
                 action = (np.array([actions[i*4], actions[i*4+1]]), np.array([actions[i*4+2], actions[i*4+3]]))
-                env2.push(action, display=True, path="push%d"%i)
+                env2.push(action, save_summary=True, path="push%d"%i)
                 if i == 0:
-                    np.testing.assert_allclose(first_step_end_state, env2.save_positions(), err_msg="Iteration %d First step \n %s \n %s" % (it, first_step_end_state, env2.save_positions()))
+                    np.testing.assert_allclose(first_step_end_state, env2.save_positions(), err_msg="Iteration %d First step \n %s \n %s" % (it, first_step_end_state, env2.save_positions()), atol=0.01)
                     np.testing.assert_almost_equal(first_step_return, env2.count_soft_threshold())
-            np.testing.assert_allclose(final_state, env2.save_positions(), err_msg="iteration %d Final \n %s \n %s" % (it, final_state, env2.save_positions()))
+            np.testing.assert_allclose(final_state, env2.save_positions(), err_msg="iteration %d Final \n %s \n %s" % (it, final_state, env2.save_positions()), atol=0.01)
             np.testing.assert_almost_equal(final_score, env2.count_soft_threshold())
     
     def test_best_sample_reproducible(self):
