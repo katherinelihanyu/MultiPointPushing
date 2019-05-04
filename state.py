@@ -215,7 +215,7 @@ class State:
             self.rod.linearVelocity[0] = 0.0
             self.rod.linearVelocity[1] = 0.0
             self.rod.angularVelocity = 0.0
-        else:
+        elif self.rod:
             self.rod.DestroyFixture(self.rodfix)
             self.world.DestroyBody(self.rod)
             self.rod = None
@@ -227,7 +227,7 @@ class State:
 
     def push(self, action, path=None, display=False, save_summary=False, save_frames=False, check_reachable=True):
         start_pt, end_pt = action
-        if not os.path.exists(path):
+        if path is not None and not os.path.exists(path):
             os.makedirs(path)
         if display:
             images = []
@@ -430,9 +430,7 @@ def visualize_push(summary_folder, img_folder, save_frames=False):
 
 
 if __name__ == "__main__":
-    # visualize_push(summary_folder="sample0/summary", img_folder="sample_visual0")
-    # visualize_push(summary_folder="push0/summary", img_folder="push_visual0")
-    push_env = State(summary=np.load("push0/summary/i.npy"))
-    push_env.snapshot("push_env.png")
-    sample_env = State(summary=np.load("sample0/summary/i.npy"))
-    sample_env.snapshot("sample_env.png")
+    NUM_STEPS = 1
+    env = State()
+    env.create_random_env(num_objs=2)
+    env.sample_closed_loop(num_steps=NUM_STEPS, num_sample=1, sample_func=lambda sample_env, sampled: sample_env.sample(num_steps=NUM_STEPS, prune_method=no_prune, metric=sample_env.count_soft_threshold, sampled=sampled, display=False, save_summary=False, path=None))

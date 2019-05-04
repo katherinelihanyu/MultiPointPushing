@@ -2,7 +2,7 @@ import numpy as np
 import unittest
 from state import *
 
-NUM_OBJS = 6
+NUM_OBJS = 10
 NUM_STEPS = 3
 NUM_SAMPLES = 1
 
@@ -94,9 +94,9 @@ class TestState(unittest.TestCase):
                 action = (np.array([actions[i*4], actions[i*4+1]]), np.array([actions[i*4+2], actions[i*4+3]]))
                 env2.push(action, save_summary=True, path="push%d"%i)
                 if i == 0:
-                    np.testing.assert_allclose(first_step_end_state, env2.save_positions(), err_msg="Iteration %d First step \n %s \n %s" % (it, first_step_end_state, env2.save_positions()), atol=0.01)
+                    np.testing.assert_allclose(first_step_end_state, env2.save_positions(), err_msg="Iteration %d First step \n %s \n %s" % (it, first_step_end_state, env2.save_positions()))
                     np.testing.assert_almost_equal(first_step_return, env2.count_soft_threshold())
-            np.testing.assert_allclose(final_state, env2.save_positions(), err_msg="iteration %d Final \n %s \n %s" % (it, final_state, env2.save_positions()), atol=0.01)
+            np.testing.assert_allclose(final_state, env2.save_positions(), err_msg="iteration %d Final \n %s \n %s" % (it, final_state, env2.save_positions()))
             np.testing.assert_almost_equal(final_score, env2.count_soft_threshold())
     
     def test_best_sample_reproducible(self):
