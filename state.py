@@ -364,6 +364,7 @@ class State:
             if num_steps - i == 1:
                 best_performance, best_push, best_state = self.greedy_step(prune_method=no_prune, metric=self.count_soft_threshold, sample_size=num_sample)
                 first_step_return = best_performance
+                first_step_end_state = best_state
             else:
                 best_performance, best_push, best_state, first_step_return, first_step_end_state = self.sample_best(num_sample=num_sample, sample_func=sample_func)
                 best_push =  (np.array([best_push[0], best_push[1]]), np.array([best_push[2], best_push[3]]))
@@ -430,7 +431,7 @@ def visualize_push(summary_folder, img_folder, save_frames=False):
 
 
 if __name__ == "__main__":
-    NUM_STEPS = 1
+    NUM_STEPS = 3
     env = State()
     env.create_random_env(num_objs=2)
     env.sample_closed_loop(num_steps=NUM_STEPS, num_sample=1, sample_func=lambda sample_env, sampled: sample_env.sample(num_steps=NUM_STEPS, prune_method=no_prune, metric=sample_env.count_soft_threshold, sampled=sampled, display=False, save_summary=False, path=None))
