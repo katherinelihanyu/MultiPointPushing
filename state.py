@@ -406,7 +406,8 @@ class State:
         pygame.image.save(self.screen, path)
         pygame.display.quit()
         pygame.quit()
-    
+
+
 def visualize_push(summary_folder, img_folder, save_frames=False):
     if not os.path.exists(img_folder):
         os.makedirs(img_folder)
