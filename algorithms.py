@@ -26,7 +26,8 @@ def run_heap(data_path, heap_num):
     path_i = os.path.join(data_path, "env%d.npy" % heap_num)
     info = np.load(path_i)
     num_objects = int(info[-1])
-    env = State(summary=info, num_objs=num_objects)
+    print("num_objects", num_objects)
+    env = State(summary=info)
     # result, actions = env.greedy(num_steps=3, prune_method=no_prune, metric=env.count_soft_threshold)
     result, best_push, best_state, best_first_step, best_first_step_end_state = env.sample_best(num_sample=3400, sample_func=lambda sample_env, sampled: sample_env.sample(
         num_steps=3, prune_method=no_prune, metric=sample_env.count_soft_threshold, sampled=sampled))
@@ -37,7 +38,7 @@ def run_heap(data_path, heap_num):
 
 
 if __name__ == "__main__":
-    returns = run_experiments(num_heaps=50, data_path="/nfs/diskstation/katherineli/states")
+    returns = run_experiments(num_heaps=1, data_path="/nfs/diskstation/katherineli/states/1_obj")
     m = np.mean(returns)
     s = np.std(returns)
     print("mean: %.2f, std: %.2f"%(m, s))
