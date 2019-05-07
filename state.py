@@ -105,7 +105,10 @@ class State:
             self.objects = []
             num_objs = int(summary[-1])
             assert (summary.shape[0]-1) % num_objs == 0
-            arr_len = summary.shape[0]//num_objs
+            if num_objs > 1:
+                arr_len = summary.shape[0]//num_objs
+            else:
+                arr_len = summary.shape[0] - 1
             self.objects = [Polygon(self.world, info=summary[arr_len*i:arr_len*(i+1)]) for i in range(num_objs)]
         b2PolygonShape.draw = State.__draw_polygon
         self.screen = None
@@ -185,6 +188,8 @@ class State:
 
     def greedy_step(self, prune_method, metric, sample_size=None):
         pushes = prune_method(self)
+        if sample_size > len(pushes):
+            sample_size = None
         if sample_size is None:
             indices = range(len(pushes))
         else:
@@ -198,7 +203,7 @@ class State:
             action = pushes[i]
             self.push(action)
             curr_score = metric()
-            if curr_score > best_performance:
+            if curr_score >= best_performance or best_push is None:
                 best_push = action
                 best_performance = curr_score
                 best_state = self.save_positions()
@@ -317,7 +322,7 @@ class State:
         unique = False
         while first_time or not unique:
             if not first_time:
-                print("retry")
+                print("sample seen before")
             actions = []
             for i in range(num_steps):
                 pushes = prune_method(self)
@@ -434,5 +439,5 @@ def visualize_push(summary_folder, img_folder, save_frames=False):
 if __name__ == "__main__":
     NUM_STEPS = 3
     env = State()
-    env.create_random_env(num_objs=2)
-    env.sample_closed_loop(num_steps=NUM_STEPS, num_sample=1, sample_func=lambda sample_env, sampled: sample_env.sample(num_steps=NUM_STEPS, prune_method=no_prune, metric=sample_env.count_soft_threshold, sampled=sampled, display=False, save_summary=False, path=None))
+    env.create_random_env(num_objs=1)
+#     env.sample_closed_loop(num_steps=NUM_STEPS, num_sample=1, sample_func=lambda sample_env, sampled: sample_env.sample(num_steps=NUM_STEPS, prune_method=no_prune, metric=sample_env.count_soft_threshold, sampled=sampled, display=False, save_summary=False, path=None))

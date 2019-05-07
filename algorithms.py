@@ -38,8 +38,10 @@ def run_heap(data_path, heap_num):
 
 
 if __name__ == "__main__":
-    returns = run_experiments(num_heaps=1, data_path="/nfs/diskstation/katherineli/states/1_obj")
-    m = np.mean(returns)
-    s = np.std(returns)
-    print("mean: %.2f, std: %.2f"%(m, s))
-    print(returns)
+#     returns = run_experiments(num_heaps=1, data_path="/nfs/diskstation/katherineli/states/1_obj")
+#     m = np.mean(returns)
+#     s = np.std(returns)
+#     print("mean: %.2f, std: %.2f"%(m, s))
+#     print(returns)
+    num_object = 13
+    create_initial_envs(num_heaps=1, num_objects=num_object, data_path="/nfs/diskstation/katherineli/states/%d_objs" % num_object)
