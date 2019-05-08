@@ -3,8 +3,8 @@ import os
 from state import *
 
 
-def create_initial_envs(num_heaps, num_objects, data_path):
-    for i in range(num_heaps):
+def create_initial_envs(start, end, num_objects, data_path):
+    for i in range(start, end):
         if not os.path.exists(data_path):
             os.makedirs(data_path)
         path = os.path.join(data_path, "env%d.npy" % i)
@@ -43,5 +43,5 @@ if __name__ == "__main__":
 #     s = np.std(returns)
 #     print("mean: %.2f, std: %.2f"%(m, s))
 #     print(returns)
-    num_object = 13
-    create_initial_envs(num_heaps=1, num_objects=num_object, data_path="/nfs/diskstation/katherineli/states/%d_objs" % num_object)
+    for num_object in range(8, 9):
+        create_initial_envs(start=46, end=50, num_objects=num_object, data_path="/nfs/diskstation/katherineli/states/%d_objs" % num_object)

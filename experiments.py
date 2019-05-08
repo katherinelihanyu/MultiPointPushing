@@ -58,7 +58,7 @@ def run_heap(data_path, heap_num, num_steps):
     before_summary = env1.save_positions()
     env2 = env1.copy()
     np.testing.assert_array_equal(before_summary, env2.save_positions())
-    final_score, actions, final_state, first_step_return, first_step_end_state = env1.sample_best(num_sample=500, sample_func=lambda sample_env, sampled: sample_env.sample(num_steps=num_steps, prune_method=no_prune, metric=sample_env.count_soft_threshold, sampled=sampled))
+    final_score, actions, final_state, first_step_return, first_step_end_state = env1.sample_best(num_sample=1, sample_func=lambda sample_env, sampled: sample_env.sample(num_steps=num_steps, prune_method=no_prune, metric=sample_env.count_soft_threshold, sampled=sampled))
     np.testing.assert_array_equal(before_summary, env1.save_positions())
     np.testing.assert_array_equal(before_summary, env2.save_positions())
     for i in range(num_steps):
@@ -85,7 +85,7 @@ def run_heap_one_step(data_path, heap_num):
     before_summary = env1.save_positions()
     env2 = env1.copy()
     np.testing.assert_array_equal(before_summary, env2.save_positions())
-    best_performance, action, best_state = env1.greedy_step(prune_method=no_prune, metric=env1.count_soft_threshold, sample_size=500)
+    best_performance, action, best_state = env1.greedy_step(prune_method=no_prune, metric=env1.count_soft_threshold, sample_size=1)
     np.testing.assert_array_equal(before_summary, env1.save_positions())
     np.testing.assert_array_equal(before_summary, env2.save_positions())
     env2.push(action)
@@ -94,11 +94,12 @@ def run_heap_one_step(data_path, heap_num):
     return best_performance, pos_diff, count_diff, 0
 
 if __name__ == '__main__':
-    for num_objects in range(12, 14):
-        for num_pushes in range(1, 4):
-            for i in range(10):
-                result, pos_diff, count_diff, max_diff_step = run_heap(data_path="/nfs/diskstation/katherineli/states/%d_objs" % num_objects, heap_num=0, num_steps=num_pushes)
-                if pos_diff == 0 and count_diff == 0:
-                    print("num_objects: %d, num_pushes: %d, iteration: %d, result: %s" % (num_objects, num_pushes, i, result))
-                else:
-                    print("num_objects: %d, num_pushes: %d, iteration: %d, result: %s, pos_diff: %s, count_diff: %s, step: %d ERROR" % (num_objects, num_pushes, i, result, pos_diff, count_diff, max_diff_step))
+    for heap_id in range(46, 50):
+        for num_objects in range(2, 14):
+            for num_pushes in range(1, 4):
+                for i in range(10):
+                    result, pos_diff, count_diff, max_diff_step = run_heap(data_path="/nfs/diskstation/katherineli/states/%d_objs" % num_objects, heap_num=heap_id, num_steps=num_pushes)
+                    if pos_diff != 0 or count_diff != 0:
+                        print("heap_num: %d, num_objects: %d, num_pushes: %d, iteration: %d, result: %s, pos_diff: %s, count_diff: %s, step: %d ERROR" % (heap_id, num_objects, num_pushes, i, result, pos_diff, count_diff, max_diff_step))
+                    elif i == 0 and num_objects == 13 and num_pushes == 3:
+                        print("heap_num: %d, num_objects: %d, num_pushes: %d, iteration: %d, result: %s" % (heap_id, num_objects, num_pushes, i, result))

@@ -440,4 +440,4 @@ if __name__ == "__main__":
     NUM_STEPS = 3
     env = State()
     env.create_random_env(num_objs=1)
-#     env.sample_closed_loop(num_steps=NUM_STEPS, num_sample=1, sample_func=lambda sample_env, sampled: sample_env.sample(num_steps=NUM_STEPS, prune_method=no_prune, metric=sample_env.count_soft_threshold, sampled=sampled, display=False, save_summary=False, path=None))
+    env.sample_closed_loop(num_steps=NUM_STEPS, num_sample=1, sample_func=lambda sample_env, sampled: sample_env.sample(num_steps=NUM_STEPS, prune_method=no_prune, metric=sample_env.count_soft_threshold, sampled=sampled, display=False, save_summary=False, path=None))
