@@ -26,11 +26,12 @@ DAMPING_FACTOR = 1 - ((1 - 0.5) / 3)
 
 
 class Polygon:
-    def __init__(self, world, position=None, vertices=None, shape=0, color=None, rod=False, info=None):
+    def __init__(self, world, position=None, angle=0.0, vertices=None, shape=0, color=None, rod=False, info=None):
         # position: numpy array of size (2,)
         # vertices: numpy array of size (15, 2) for group 0
         # color: 4-tuple
         # info: numpy array of size (38,) for group 0
+        # obj.body.position[0], obj.body.position[1], obj.body.angle
         self.world = world
         if info is None:
             self.shape = shape
@@ -56,7 +57,7 @@ class Polygon:
         if rod:
             self.body = self.world.CreateKinematicBody(position=self.position, allowSleep=False)
         else:
-            self.body = self.world.CreateDynamicBody(position=self.position.tolist(), allowSleep=False)
+            self.body = self.world.CreateDynamicBody(position=self.position, allowSleep=False)
         self.fixture = self.body.CreatePolygonFixture(density=1, vertices=self.vertices.tolist(), friction=FRICTION)
         self.bounding_circle_radius = math.sqrt(max(self.vertices[:, 0]**2 + self.vertices[:, 1]**2))
 
@@ -125,6 +126,7 @@ class State:
     def copy(self):
         state_copy = State()
         state_copy.objects = [object.copy(state_copy.world) for object in self.objects]
+        state_copy.load_positions(self.save_positions())
         return state_copy
 
     def clear(self):
@@ -174,7 +176,7 @@ class State:
 
     def equal(self, state):
         return len(self.objects) == len(state.objects) \
-               and all([self.objects[i].equal(state.objects[i]) for i in range(len(self.objects))])
+               and all([self.objects[i].equal(state.objects[i]) for i in range(len(self.objects))]) and np.array_equal(self.save_positions(), state.save_positions())
 
     def greedy(self, num_steps, prune_method, metric):
         actions = []
@@ -188,7 +190,7 @@ class State:
 
     def greedy_step(self, prune_method, metric, sample_size=None):
         pushes = prune_method(self)
-        if sample_size > len(pushes):
+        if sample_size is not None and sample_size > len(pushes):
             sample_size = None
         if sample_size is None:
             indices = range(len(pushes))
@@ -230,7 +232,7 @@ class State:
             obj.body.linearVelocity[1] = 0.0
             obj.body.angularVelocity = 0.0
 
-    def push(self, action, path=None, display=False, save_summary=False, save_frames=False, check_reachable=True):
+    def push(self, action, path=None, display=False, save_summary=False, save_frames=True, check_reachable=True):
         start_pt, end_pt = action
         if path is not None and not os.path.exists(path):
             os.makedirs(path)
@@ -344,7 +346,7 @@ class State:
                 unique = True
         return final_score_sample, actions, final_state, first_step_return, first_step_end_state
 
-    def sample_best(self, num_sample, sample_func):
+    def sample_best(self, step, num_sample, sample_func):
         best_result = 0
         best_push = None
         best_state = None
@@ -353,7 +355,7 @@ class State:
         sampled = set()
         for _ in range(num_sample):
             sample_env = self.copy()
-            result, action, state, first_step_return, first_step_end_state = sample_func(sample_env, sampled)
+            result, action, state, first_step_return, first_step_end_state = sample_func(sample_env, sampled, step)
             assert action not in sampled
             sampled.add(action)
             if result > best_result:
@@ -371,16 +373,11 @@ class State:
                 first_step_return = best_performance
                 first_step_end_state = best_state
             else:
-                best_performance, best_push, best_state, first_step_return, first_step_end_state = self.sample_best(num_sample=num_sample, sample_func=sample_func)
+                best_performance, best_push, best_state, first_step_return, first_step_end_state = self.sample_best(num_sample=num_sample, step=i, sample_func=sample_func)
                 best_push =  (np.array([best_push[0], best_push[1]]), np.array([best_push[2], best_push[3]]))
-            self.push(best_push)
+            self.push(best_push, path="push%d"%i, display=True)
             np.testing.assert_allclose(first_step_end_state, self.save_positions(), err_msg="%s \n %s" % (first_step_end_state, self.save_positions()))
             np.testing.assert_almost_equal(first_step_return, self.count_soft_threshold())
-            # if not isclose(first_step_return, self.count_soft_threshold(), abs_tol=1e-3):
-            #     print("CLOSED LOOP NOT REPRODUCIBLE at step %d. Expected: %s; actual: %s" % (i, first_step_return, self.count_soft_threshold()))
-            #     print(first_step_end_state)
-            #     print()
-            #     print(self.save_positions())
         return best_performance
 
     def save(self, path=None):
@@ -440,4 +437,4 @@ if __name__ == "__main__":
     NUM_STEPS = 3
     env = State()
     env.create_random_env(num_objs=1)
-    env.sample_closed_loop(num_steps=NUM_STEPS, num_sample=1, sample_func=lambda sample_env, sampled: sample_env.sample(num_steps=NUM_STEPS, prune_method=no_prune, metric=sample_env.count_soft_threshold, sampled=sampled, display=False, save_summary=False, path=None))
+    env.sample_closed_loop(num_steps=NUM_STEPS, num_sample=1, sample_func=lambda sample_env, sampled, step: sample_env.sample(num_steps=NUM_STEPS, prune_method=no_prune, metric=sample_env.count_soft_threshold, sampled=sampled, display=True, path="sample_step%d_"%step))
