@@ -203,7 +203,7 @@ class State:
         for i in indices:
             self.load_positions(summary)
             action = pushes[i]
-            self.push(action)
+            self.push(action, display=False, path="sample_step2_0")
             curr_score = metric()
             if curr_score >= best_performance or best_push is None:
                 best_push = action
@@ -346,7 +346,7 @@ class State:
                 unique = True
         return final_score_sample, actions, final_state, first_step_return, first_step_end_state
 
-    def sample_best(self, step, num_sample, sample_func):
+    def sample_best(self, step, num_steps, num_sample, sample_func):
         best_result = 0
         best_push = None
         best_state = None
@@ -355,7 +355,7 @@ class State:
         sampled = set()
         for _ in range(num_sample):
             sample_env = self.copy()
-            result, action, state, first_step_return, first_step_end_state = sample_func(sample_env, sampled, step)
+            result, action, state, first_step_return, first_step_end_state = sample_func(sample_env, sampled, step, num_steps)
             assert action not in sampled
             sampled.add(action)
             if result > best_result:
@@ -373,10 +373,10 @@ class State:
                 first_step_return = best_performance
                 first_step_end_state = best_state
             else:
-                best_performance, best_push, best_state, first_step_return, first_step_end_state = self.sample_best(num_sample=num_sample, step=i, sample_func=sample_func)
+                best_performance, best_push, best_state, first_step_return, first_step_end_state = self.sample_best(num_sample=num_sample, step=i, num_steps=num_steps-i, sample_func=sample_func)
                 best_push =  (np.array([best_push[0], best_push[1]]), np.array([best_push[2], best_push[3]]))
-            self.push(best_push, path="push%d"%i, display=True)
-            np.testing.assert_allclose(first_step_end_state, self.save_positions(), err_msg="%s \n %s" % (first_step_end_state, self.save_positions()))
+            self.push(best_push, path="push%d"%i, display=False)
+            np.testing.assert_allclose(first_step_end_state, self.save_positions(), err_msg="Step %d \n %s \n %s" % (i, first_step_end_state, self.save_positions()))
             np.testing.assert_almost_equal(first_step_return, self.count_soft_threshold())
         return best_performance
 
@@ -437,4 +437,4 @@ if __name__ == "__main__":
     NUM_STEPS = 3
     env = State()
     env.create_random_env(num_objs=1)
-    env.sample_closed_loop(num_steps=NUM_STEPS, num_sample=1, sample_func=lambda sample_env, sampled, step: sample_env.sample(num_steps=NUM_STEPS, prune_method=no_prune, metric=sample_env.count_soft_threshold, sampled=sampled, display=True, path="sample_step%d_"%step))
+    env.sample_closed_loop(num_steps=NUM_STEPS, num_sample=1, sample_func=lambda sample_env, sampled, step, num_steps: sample_env.sample(num_steps=num_steps, prune_method=no_prune, metric=sample_env.count_soft_threshold, sampled=sampled, display=False, path="sample_step%d_"%step))
