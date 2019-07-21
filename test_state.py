@@ -49,7 +49,6 @@ class TestState(unittest.TestCase):
         env1 = State()
         env1.create_random_env(num_objs=NUM_OBJS)
         info = env1.save()
-        num_ob = int(info[-1])
         env2 = State(summary=info)
         self.assertTrue(env1.equal(env2))
 
