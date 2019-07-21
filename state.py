@@ -376,8 +376,8 @@ class State:
                 best_performance, best_push, best_state, first_step_return, first_step_end_state = self.sample_best(num_sample=num_sample, step=i, num_steps=num_steps-i, sample_func=sample_func)
                 best_push =  (np.array([best_push[0], best_push[1]]), np.array([best_push[2], best_push[3]]))
             self.push(best_push, path="push%d"%i, display=False)
-            np.testing.assert_allclose(first_step_end_state, self.save_positions(), err_msg="Step %d \n %s \n %s" % (i, first_step_end_state, self.save_positions()))
-            np.testing.assert_almost_equal(first_step_return, self.count_soft_threshold())
+#             np.testing.assert_allclose(first_step_end_state, self.save_positions(), err_msg="Step %d \n %s \n %s" % (i, first_step_end_state, self.save_positions()))
+#             np.testing.assert_almost_equal(first_step_return, self.count_soft_threshold())
         return best_performance
 
     def save(self, path=None):
