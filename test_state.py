@@ -94,8 +94,7 @@ class TestState(unittest.TestCase):
     def test_best_sample_reproducible(self):
         env = State()
         env.create_random_env(num_objs=NUM_OBJS)
-        best_score, best_action, best_state, best_first_step, best_first_step_end_state = env.sample_best(num_sample=NUM_SAMPLES, sample_func=lambda e, sampled: e.sample(
-            num_steps=NUM_STEPS, prune_method=no_prune, metric=e.count_soft_threshold, sampled=sampled))
+        best_score, best_action, best_state, best_first_step, best_first_step_end_state = env.sample_best(num_sample=NUM_SAMPLES, num_steps=NUM_STEPS, step=0,  sample_func=lambda sample_env, sampled, step, num_steps: sample_env.sample(num_steps=num_steps, prune_method=no_prune, metric=sample_env.count_soft_threshold, sampled=sampled, display=False, path="sample_step%d_" % step))
         for i in range(NUM_STEPS):
             action = (np.array([best_action[i*4], best_action[i*4+1]]), np.array([best_action[i*4+2], best_action[i*4+3]]))
             env.push(action)
