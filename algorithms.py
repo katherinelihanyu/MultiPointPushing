@@ -3,8 +3,10 @@ import os
 from state import *
 
 
-def create_initial_envs(start, end, num_objects, data_path):
-    for i in range(start, end):
+def create_initial_envs(start_index, end_index, num_objects, data_path):
+    """Create initial environments in data_path numbered from start_index to end_index.
+    """
+    for i in range(start_index, end_index):
         if not os.path.exists(data_path):
             os.makedirs(data_path)
         path = os.path.join(data_path, "env%d.npy" % i)
