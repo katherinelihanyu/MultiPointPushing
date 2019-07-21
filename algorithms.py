@@ -32,7 +32,7 @@ def run_heap(data_path, heap_num):
     # result, actions = env.greedy(num_steps=3, prune_method=no_prune, metric=env.count_soft_threshold)
 #     result, best_push, best_state, best_first_step, best_first_step_end_state = env.sample_best(num_sample=3400, sample_func=lambda sample_env, sampled: sample_env.sample(
 #         num_steps=3, prune_method=no_prune, metric=sample_env.count_soft_threshold, sampled=sampled))
-    result = env.sample_closed_loop(num_steps=3, num_sample=2400, sample_func=lambda sample_env, sampled, step, num_steps: sample_env.sample(num_steps=num_steps, prune_method=no_prune, metric=sample_env.count_soft_threshold, sampled=sampled, display=False, path="sample_step%d_"%step))
+    result = env.sample_closed_loop(num_steps=3, num_sample=200, sample_func=lambda sample_env, sampled, step, num_steps: sample_env.sample(num_steps=num_steps, prune_method=no_prune, metric=sample_env.count_soft_threshold, sampled=sampled, display=False, path="sample_step%d_"%step))
     print("heap%d: %s" % (heap_num, result))
     return result
 
