@@ -5,6 +5,14 @@ Click [here](https://docs.google.com/presentation/d/1SVCs2WHByOlnsANJ-5jjQuTtSxt
 
 ## Project Overview
 
+### Policies
+
+The project implements 3 planing policies: greedy, open-loop sampling, and closed-loop sampling.
+
+- Greedy: At each step, performs the push with maximum reward.
+- Open-loop sampling: Samples sample_size number of multi-step pushes. Select the sample with the maximum reward.
+- Closed-loop sampling: At each step, samples sample_size number of multi-step pushes. Perform the first step of the sample with the maximum reward.
+
 ### Code
 
 The purpose of each relevant file is described below.
@@ -13,14 +21,6 @@ The purpose of each relevant file is described below.
 - `algorithm.py`: run experiments
 - `test_state.py`: test for stability of the environments
 - `helpers.py`: geometry-related helper functions
-
-### Policies
-
-The project implements 3 planing policies: greedy, open-loop sampling, and closed-loop sampling.
-
-- Greedy: At each step, performs the push with maximum reward.
-- Open-loop sampling: Samples sample_size number of multi-step pushes. Select the sample with the maximum reward.
-- Closed-loop sampling: At each step, samples sample_size number of multi-step pushes. Perform the first step of the sample with the maximum reward.
 
 ## Prerequisites
 
@@ -55,7 +55,7 @@ python algorithm.py
 ```
 The results will be printed in the terminal. If `display` is True, GIF of each push will be saved in `data_path`.
 
-### Expected Results
+### Results
 
 Below are my results with **10 objects** and **50 heaps**. Your results may be slightly different due to different initial states.
 Click [here](https://docs.google.com/presentation/d/1SVCs2WHByOlnsANJ-5jjQuTtSxtw1dyAYsxmp3lK2Gs/edit#slide=id.g4ee20b2f04_0_164) for details on the metric `count_soft_threshold`.
