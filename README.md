@@ -7,7 +7,7 @@ Click [here](https://docs.google.com/presentation/d/1SVCs2WHByOlnsANJ-5jjQuTtSxt
 
 ### Policies
 
-The project implements 3 planing policies: greedy, open-loop sampling, and closed-loop sampling.
+The project implements 3 planning policies: greedy, open-loop sampling, and closed-loop sampling.
 
 - Greedy: At each step, performs the push with maximum reward.
 - Open-loop sampling: Samples sample_size number of multi-step pushes. Select the sample with the maximum reward.
