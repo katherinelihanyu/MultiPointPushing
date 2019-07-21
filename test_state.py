@@ -85,9 +85,9 @@ class TestState(unittest.TestCase):
             action = (np.array([actions[i*4], actions[i*4+1]]), np.array([actions[i*4+2], actions[i*4+3]]))
             env2.push(action, save_summary=True, path="push%d"%i)
             if i == 0:
-                np.testing.assert_allclose(first_step_end_state, env2.save_positions(), err_msg="First step \n %s \n %s" % (first_step_end_state, env2.save_positions()))
+                np.testing.assert_allclose(first_step_end_state, env2.save_positions(), err_msg="First step \n %s \n %s \n %s" % (first_step_end_state, env2.save_positions(), first_step_end_state - env2.save_positions()))
                 np.testing.assert_almost_equal(first_step_return, env2.count_soft_threshold())
-        np.testing.assert_allclose(final_state, env2.save_positions(), err_msg="Final \n %s \n %s" % (final_state, env2.save_positions()))
+        np.testing.assert_allclose(final_state, env2.save_positions(), err_msg="Final \n %s \n %s \n %s" % (final_state, env2.save_positions(), final_state - env2.save_positions()))
         np.testing.assert_almost_equal(final_score, env2.count_soft_threshold())
     
     def test_best_sample_reproducible(self):
@@ -98,9 +98,9 @@ class TestState(unittest.TestCase):
             action = (np.array([best_action[i*4], best_action[i*4+1]]), np.array([best_action[i*4+2], best_action[i*4+3]]))
             env.push(action)
             if i == 0:
-                np.testing.assert_allclose(best_first_step_end_state, env.save_positions(), err_msg="First step \n %s \n %s" % (best_first_step_end_state, env.save_positions()))
+                np.testing.assert_allclose(best_first_step_end_state, env.save_positions(), err_msg="First step \n %s \n %s \n %s" % (best_first_step_end_state, env.save_positions(), best_first_step_end_state - env.save_positions()))
                 self.assertEqual(best_first_step, env.count_soft_threshold())
-        np.testing.assert_allclose(best_state, env.save_positions(), err_msg="%s \n %s" % (best_state, env.save_positions()))
+        np.testing.assert_allclose(best_state, env.save_positions(), err_msg="%s \n %s \n %s" % (best_state, env.save_positions(), best_state - env.save_positions()))
         self.assertEqual(best_score, env.count_soft_threshold())
 
     def test_greedy_step_reproducible(self):
@@ -112,7 +112,7 @@ class TestState(unittest.TestCase):
         np.testing.assert_array_equal(starting_state, test_env.save_positions())
         self.assertEqual(starting_score, test_env.count_soft_threshold())
         test_env.push(best_push, path="push", display=False)
-        np.testing.assert_allclose(best_state, test_env.save_positions(), err_msg="%s \n %s" % (best_state, test_env.save_positions()))
+        np.testing.assert_allclose(best_state, test_env.save_positions(), err_msg="%s \n %s \n %s" % (best_state, test_env.save_positions(), best_state - test_env.save_positions()))
         np.testing.assert_almost_equal(best_result, test_env.count_soft_threshold())
 
 
